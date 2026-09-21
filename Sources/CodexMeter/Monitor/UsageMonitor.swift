@@ -100,9 +100,8 @@ final class UsageMonitor: ObservableObject {
                 NSLog("CodexMeter: no credentials (auth.json missing or API-key mode)")
                 return
             }
-            NSLog("CodexMeter: credentials ok, expiry=%@", "\(try? authStore.tokenExpiry() ?? nil)")
-
             let expiry = try? authStore.tokenExpiry()
+            NSLog("CodexMeter: credentials ok, expiry=\(expiry.map { "\($0)" } ?? "unknown")")
             if RefreshDecision.shouldRefresh(tokenExp: expiry, now: Date(), leadTime: tokenLeadTime) {
                 NSLog("CodexMeter: proactive token refresh")
                 credentials = try await authStore.refresh()
