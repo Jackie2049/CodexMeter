@@ -112,6 +112,32 @@ private func testResetTextZeroMeansWaitingNotRecovered() throws {
     try expectEqual(QuotaDisplay.resetText(resetAt: now.addingTimeInterval(-60), now: now), "等待更新", "past zero")
 }
 
+// MARK: - composed menu bar title (NSStatusItem)
+
+private func testMenuBarTitle() throws {
+    let ok = snapshot(
+        primary: window(used: 43, seconds: 18000),
+        secondary: window(used: 16, seconds: 604800))
+
+    try expectEqual(
+        QuotaDisplay.menuBarTitle(snapshot: ok, notLoggedIn: false, loginExpired: false, dataWarning: false),
+        "Codex ⚡ 5小时 57% · 周度 84%", "healthy state")
+
+    try expectEqual(
+        QuotaDisplay.menuBarTitle(snapshot: nil, notLoggedIn: true, loginExpired: false, dataWarning: false),
+        "Codex ⚠️ 未登录", "no login")
+    try expectEqual(
+        QuotaDisplay.menuBarTitle(snapshot: ok, notLoggedIn: false, loginExpired: true, dataWarning: false),
+        "Codex ⚠️ 过期", "expired login wins over data")
+
+    try expectEqual(
+        QuotaDisplay.menuBarTitle(snapshot: ok, notLoggedIn: false, loginExpired: false, dataWarning: true),
+        "Codex ⚡ 5小时 57% · 周度 84% ⚠️", "stale/failed data appends warning marker")
+    try expectEqual(
+        QuotaDisplay.menuBarTitle(snapshot: nil, notLoggedIn: false, loginExpired: false, dataWarning: false),
+        "Codex ⚡ –", "no data yet")
+}
+
 let quotaDisplayTests: [TestEntry] = [
     TestEntry(name: "UsageWindow.remainingPercent", run: sync(testRemainingPercent)),
     TestEntry(name: "QuotaThresholds.tierBoundaries", run: sync(testQuotaTierBoundaries)),
@@ -123,4 +149,5 @@ let quotaDisplayTests: [TestEntry] = [
     TestEntry(name: "QuotaDisplay.statusBarIgnoresLimitReached", run: sync(testStatusBarTextIgnoresLimitReached)),
     TestEntry(name: "QuotaDisplay.resetTextNaturalChinese", run: sync(testResetTextNaturalChinese)),
     TestEntry(name: "QuotaDisplay.resetTextZeroMeansWaiting", run: sync(testResetTextZeroMeansWaitingNotRecovered)),
+    TestEntry(name: "QuotaDisplay.menuBarTitle", run: sync(testMenuBarTitle)),
 ]

@@ -65,6 +65,20 @@ public enum QuotaDisplay {
         return parts.joined(separator: " · ")
     }
 
+    /// Full NSStatusItem title: "Codex ⚡ 5小时 57% · 周度 84%".
+    /// Auth problems win over data; stale/failed data keeps numbers but
+    /// appends a warning marker so old values are never mistaken for live.
+    public static func menuBarTitle(snapshot: UsageSnapshot?,
+                                    notLoggedIn: Bool,
+                                    loginExpired: Bool,
+                                    dataWarning: Bool) -> String {
+        if notLoggedIn { return "Codex ⚠️ 未登录" }
+        if loginExpired { return "Codex ⚠️ 过期" }
+        let quota = snapshot.flatMap { statusBarText($0) } ?? "–"
+        let warning = (dataWarning && snapshot != nil) ? " ⚠️" : ""
+        return "Codex ⚡ \(quota)\(warning)"
+    }
+
     /// Natural-Chinese reset countdown: "6 天 13 小时后重置", "3 小时后重置",
     /// "42 分后重置" — no seconds, no "157h46m". A countdown that has reached
     /// zero shows "等待更新": passing zero does NOT mean the quota recovered,

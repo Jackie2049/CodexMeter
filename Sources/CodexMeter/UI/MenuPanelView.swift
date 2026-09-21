@@ -24,11 +24,6 @@ struct MenuPanelView: View {
             Divider()
                 .padding(.top, 14)
 
-            settings
-
-            Divider()
-                .padding(.vertical, 12)
-
             bottomBar
         }
         .padding(18)
@@ -57,28 +52,56 @@ struct MenuPanelView: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("CodexMeter")
                 .font(.system(size: 13, weight: .semibold))
-            if let plan = monitor.snapshot?.planType {
-                Text(plan.uppercased())
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+            if let snapshot = monitor.snapshot {
+                HStack(spacing: 4) {
+                    if let plan = snapshot.planType {
+                        Text(Self.planDisplay(plan))
+                    }
+                    if snapshot.resetCreditsAvailable > 0 {
+                        Text("· \(snapshot.resetCreditsAvailable) 次可用重置")
+                    }
+                }
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
             }
             Spacer()
-            Menu {
-                Button("退出 CodexMeter") { NSApp.terminate(nil) }
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .frame(width: 24, height: 24)
-            .contentShape(Rectangle())
-            .help("更多操作")
-            .accessibilityLabel("更多操作")
+            settingsMenu
         }
         .padding(.bottom, 14)
+    }
+
+    static func planDisplay(_ raw: String) -> String {
+        raw.prefix(1).uppercased() + raw.dropFirst()
+    }
+
+    private var settingsMenu: some View {
+        Menu {
+            Picker("轮询间隔", selection: $pollInterval) {
+                ForEach(AppSettings.pollIntervalOptions, id: \.self) { option in
+                    Text(AppSettings.label(forInterval: option)).tag(option)
+                }
+            }
+            .pickerStyle(.inline)
+            Toggle("用量阈值通知", isOn: $notificationsEnabled)
+            if LoginItem.isSupported {
+                Toggle("开机自启", isOn: Binding(
+                    get: { LoginItem.isEnabled },
+                    set: { _ = LoginItem.setEnabled($0) }))
+            }
+            Divider()
+            Button("退出 CodexMeter") { NSApp.terminate(nil) }
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .frame(width: 24, height: 24)
+        .contentShape(Rectangle())
+        .help("设置")
+        .accessibilityLabel("设置")
     }
 
     // MARK: - Compact status line (errors only; low quota speaks via color)
@@ -204,26 +227,12 @@ struct MenuPanelView: View {
 
     @ViewBuilder
     private var infoLines: some View {
-        if let snapshot = monitor.snapshot {
-            VStack(alignment: .leading, spacing: 4) {
-                if snapshot.resetCreditsAvailable > 0 {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                        Text("\(snapshot.resetCreditsAvailable) 次可用重置")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                if snapshot.hasCredits {
-                    Text("Credits $\(snapshot.creditBalance)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-            }
-            .padding(.top, 12)
+        if let snapshot = monitor.snapshot, snapshot.hasCredits {
+            Text("Credits $\(snapshot.creditBalance)")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .padding(.top, 12)
         }
     }
 
