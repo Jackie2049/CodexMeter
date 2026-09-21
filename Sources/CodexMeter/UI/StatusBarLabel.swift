@@ -1,8 +1,10 @@
 import CodexMeterCore
 import SwiftUI
 
-/// Menu bar label: `⚡ 33% | 5%` (5-hour | weekly). Colors shift with load;
-/// errors and missing data degrade to "–" / ⚠ marks.
+/// Menu bar label: remaining quota per window, e.g. `5h 67% · 周 95%`.
+/// Slots are duration-based; a plan without a window shows `—` for it.
+/// limitReached switches the icon (numbers stay). Stale/failed data adds
+/// a warning marker so old numbers are never mistaken for live ones.
 struct StatusBarLabel: View {
     @ObservedObject var monitor: UsageMonitor
 
@@ -11,13 +13,21 @@ struct StatusBarLabel: View {
             Image(systemName: icon)
             Text(text)
                 .monospacedDigit()
+            if showsDataWarning {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.caption)
+            }
         }
+        .help("剩余额度")
     }
 
     private var icon: String {
         switch monitor.authState {
         case .noAuth, .loginExpired: return "exclamationmark.triangle"
-        case .ok, .unknown: return "bolt.fill"
+        case .ok, .unknown:
+            return monitor.snapshot?.limitReached == true
+                ? "exclamationmark.triangle.fill"
+                : "bolt.fill"
         }
     }
 
@@ -26,18 +36,11 @@ struct StatusBarLabel: View {
         case .noAuth: return "未登录"
         case .loginExpired: return "过期"
         case .unknown, .ok:
-            guard let snapshot = monitor.snapshot,
-                  let primary = snapshot.primary,
-                  let secondary = snapshot.secondary
-            else { return "–% | –%" }
-            let primaryText = snapshot.limitReached ? "顶" : "\(primary.usedPercent)%"
-            return "\(primaryText) | \(secondary.usedPercent)%"
+            return monitor.snapshot.flatMap { QuotaDisplay.statusBarText($0) } ?? "–"
         }
     }
 
-    private static func usageColor(_ percent: Int) -> Color {
-        if percent >= 90 { return .red }
-        if percent >= 70 { return .orange }
-        return .primary
+    private var showsDataWarning: Bool {
+        monitor.snapshot != nil && (monitor.lastError != nil || monitor.isStale)
     }
 }

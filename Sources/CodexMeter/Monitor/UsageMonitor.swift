@@ -17,12 +17,15 @@ final class UsageMonitor: ObservableObject {
     @Published private(set) var lastRefresh: Date?
     @Published private(set) var authState: AuthState = .unknown
     @Published private(set) var isRefreshing = false
+    @Published private(set) var isStale = false
 
     private let authStore: CodexAuthStore
     private let client: CodexUsageClient
     private let gate: NotificationGate
+    private let recoveryTracker: RecoveryTracker
 
     private var pollTimer: Timer?
+    private var stalenessTimer: Timer?
     private var consecutiveFailures = 0
     private var lastAutoRefresh: Date?
     private let tokenLeadTime: TimeInterval = 24 * 3600
@@ -30,21 +33,40 @@ final class UsageMonitor: ObservableObject {
 
     init(authStore: CodexAuthStore = CodexAuthStore(),
          client: CodexUsageClient = CodexUsageClient(),
-         gate: NotificationGate = NotificationGate(defaults: .standard)) {
+         gate: NotificationGate = NotificationGate(defaults: .standard),
+         recoveryTracker: RecoveryTracker = RecoveryTracker(defaults: .standard)) {
         self.authStore = authStore
         self.client = client
         self.gate = gate
+        self.recoveryTracker = recoveryTracker
     }
 
     func start() {
         guard !started else { return }
         started = true
         schedulePoll(firingNow: true)
+        startStalenessTicker()
         NotificationCenter.default.addObserver(
             forName: NSWorkspace.didWakeNotification,
             object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.refreshIfStale(maxAge: 5) }
         }
+    }
+
+    /// Keeps `isStale` honest between polls so the menu bar marker flips
+    /// on wall-clock time, not only on refresh attempts.
+    private func startStalenessTicker() {
+        stalenessTimer?.invalidate()
+        let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.updateStaleness() }
+        }
+        timer.tolerance = 5
+        RunLoop.main.add(timer, forMode: .common)
+        stalenessTimer = timer
+    }
+
+    private func updateStaleness() {
+        isStale = Staleness.isStale(lastRefresh: lastRefresh, now: Date(), interval: pollInterval)
     }
 
     var pollInterval: TimeInterval {
@@ -120,6 +142,7 @@ final class UsageMonitor: ObservableObject {
             lastError = nil
             consecutiveFailures = 0
             lastRefresh = Date()
+            updateStaleness()
         } catch AuthStoreError.refreshRejected {
             authState = .loginExpired
             lastError = "登录已过期，请重新运行 codex login"
@@ -136,11 +159,18 @@ final class UsageMonitor: ObservableObject {
         let fresh = try await client.fetchUsage(credentials: credentials)
         snapshot = fresh
         if let primary = fresh.primary, let secondary = fresh.secondary {
-            NSLog("CodexMeter refresh: 5h=%d%% weekly=%d%% plan=%@", primary.usedPercent, secondary.usedPercent, fresh.planType ?? "-")
+            NSLog("CodexMeter refresh: primary=%d%% secondary=%d%% plan=%@", primary.usedPercent, secondary.usedPercent, fresh.planType ?? "-")
         }
+
+        // Threshold alerts, merged into a single notification per refresh.
         if AppSettings.notificationsEnabled {
-            for alert in gate.evaluate(snapshot: fresh) {
-                NotificationManager.shared.deliver(message: alert.message)
+            let alerts = gate.evaluate(snapshot: fresh)
+            if !alerts.isEmpty {
+                NotificationManager.shared.deliver(message: alerts.map(\.message).joined(separator: "；"))
+            }
+            // Recovery only counts when confirmed by this fresh snapshot.
+            if recoveryTracker.record(limitReached: fresh.limitReached) == .recovered {
+                NotificationManager.shared.deliver(message: "Codex 额度已恢复（已确认新数据）")
             }
         }
     }
