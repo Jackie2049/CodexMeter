@@ -53,6 +53,7 @@ public final class CodexAuthStore {
 
         var request = URLRequest(url: Self.refreshURL)
         request.httpMethod = "POST"
+        request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: [
             "grant_type": "refresh_token",

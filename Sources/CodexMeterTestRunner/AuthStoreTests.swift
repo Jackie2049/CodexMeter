@@ -1,5 +1,5 @@
 import Foundation
-@testable import CodexMeterCore
+import CodexMeterCore
 
 private func readBody(_ request: URLRequest) -> Data {
     if let body = request.httpBody { return body }

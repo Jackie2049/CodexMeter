@@ -1,5 +1,5 @@
 import Foundation
-@testable import CodexMeterCore
+import CodexMeterCore
 
 func makeJWT(payload: [String: Any]) -> String {
     func b64(_ dict: [String: Any]) -> String {

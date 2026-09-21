@@ -4,6 +4,12 @@ public struct UsageWindow: Equatable, Sendable {
     public let usedPercent: Int
     public let windowSeconds: Int
     public let resetAt: Date
+
+    public init(usedPercent: Int, windowSeconds: Int, resetAt: Date) {
+        self.usedPercent = usedPercent
+        self.windowSeconds = windowSeconds
+        self.resetAt = resetAt
+    }
 }
 
 public struct UsageSnapshot: Equatable, Sendable {
@@ -14,6 +20,18 @@ public struct UsageSnapshot: Equatable, Sendable {
     public let resetCreditsAvailable: Int
     public let hasCredits: Bool
     public let creditBalance: String
+
+    public init(planType: String?, limitReached: Bool,
+                primary: UsageWindow?, secondary: UsageWindow?,
+                resetCreditsAvailable: Int, hasCredits: Bool, creditBalance: String) {
+        self.planType = planType
+        self.limitReached = limitReached
+        self.primary = primary
+        self.secondary = secondary
+        self.resetCreditsAvailable = resetCreditsAvailable
+        self.hasCredits = hasCredits
+        self.creditBalance = creditBalance
+    }
 
     public static func parse(_ data: Data) throws -> UsageSnapshot {
         let response = try JSONDecoder.snakeCase.decode(UsageResponse.self, from: data)

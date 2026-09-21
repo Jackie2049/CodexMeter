@@ -1,5 +1,5 @@
 import Foundation
-@testable import CodexMeterCore
+import CodexMeterCore
 
 // MARK: - Mock URLProtocol (test-only)
 
@@ -106,8 +106,24 @@ private func testClientThrowsHTTPErrorOn500() async throws {
     }
 }
 
+private func testClientUsesBoundedRequestTimeout() async throws {
+    var capturedRequest: URLRequest?
+    MockURLProtocol.handler = { request in
+        capturedRequest = request
+        return (httpResponse(200, request.url!), okBody())
+    }
+    let client = CodexUsageClient(session: makeMockSession())
+
+    _ = try await client.fetchUsage(credentials: credentials)
+
+    // A dead network path must not hang the poll loop for the 60s default.
+    let request = try expectNotNil(capturedRequest, "request captured")
+    try expectEqual(request.timeoutInterval, 15, "bounded timeout")
+}
+
 let usageClientTests: [TestEntry] = [
     TestEntry(name: "CodexUsageClient.buildsRequestAndParses", run: testClientBuildsRequestWithAuthHeadersAndParses),
     TestEntry(name: "CodexUsageClient.throwsUnauthorizedOn401", run: testClientThrowsUnauthorizedOn401),
     TestEntry(name: "CodexUsageClient.throwsHTTPErrorOn500", run: testClientThrowsHTTPErrorOn500),
+    TestEntry(name: "CodexUsageClient.usesBoundedRequestTimeout", run: testClientUsesBoundedRequestTimeout),
 ]

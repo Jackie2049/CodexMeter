@@ -1,5 +1,5 @@
 import Foundation
-@testable import CodexMeterCore
+import CodexMeterCore
 
 private func snapshot(
     primaryPercent: Int = 10,

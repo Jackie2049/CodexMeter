@@ -1,5 +1,5 @@
 import Foundation
-@testable import CodexMeterCore
+import CodexMeterCore
 
 private func testBackoffPolicy() throws {
     // No failures → no retry delay.

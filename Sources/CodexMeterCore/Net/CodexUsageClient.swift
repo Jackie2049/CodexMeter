@@ -36,6 +36,7 @@ public final class CodexUsageClient {
     public func fetchUsage(credentials: CodexCredentials) async throws -> UsageSnapshot {
         var request = URLRequest(url: baseURL.appendingPathComponent("wham/usage"))
         request.httpMethod = "GET"
+        request.timeoutInterval = 15
         request.setValue("Bearer \(credentials.accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue(credentials.accountID, forHTTPHeaderField: "chatgpt-account-id")
         request.setValue("application/json", forHTTPHeaderField: "Accept")

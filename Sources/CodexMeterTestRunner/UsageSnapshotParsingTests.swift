@@ -1,5 +1,5 @@
 import Foundation
-@testable import CodexMeterCore
+import CodexMeterCore
 
 /// Fixture based on a real (sanitized) wham/usage response captured 2026-09-21.
 private let realFixture = """
