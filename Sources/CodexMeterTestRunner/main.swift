@@ -2,6 +2,7 @@ import Foundation
 
 let allTests: [TestEntry] = snapshotTests + authDecisionTests + backoffTests
     + usageClientTests + authStoreTests + notificationTests
+    + quotaDisplayTests + stalenessTests + recoveryTrackerTests
 
 var failures = 0
 
