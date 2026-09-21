@@ -35,7 +35,7 @@ private func testShortWindowFiresAtRemaining20Once() throws {
     // used 80 → remaining 20 → at threshold → fires.
     let first = gate.evaluate(snapshot: snapshot(primaryPercent: 80))
     try expectEqual(first.count, 1, "first crossing fires")
-    try expectTrue(first[0].message.contains("5 小时"), "message names the window")
+    try expectTrue(first[0].message.contains("5小时"), "message names the window")
     try expectTrue(first[0].message.contains("剩余 20%"), "message carries remaining quota")
 
     // Still at/below threshold within the same window → silent.
@@ -53,7 +53,7 @@ private func testLongWindowFiresAtRemaining10() throws {
     // used 90 → remaining 10 → fires; used 89 → remaining 11 → silent.
     let fired = gate.evaluate(snapshot: snapshot(secondaryPercent: 90))
     try expectEqual(fired.count, 1, "weekly crossing fires")
-    try expectTrue(fired[0].message.contains("Weekly"), "message names weekly window")
+    try expectTrue(fired[0].message.contains("周度"), "message names weekly window")
     try expectTrue(fired[0].message.contains("剩余 10%"), "message carries remaining quota")
 
     let fresh = makeGate()
@@ -66,7 +66,7 @@ private func testProShapeSingleWeeklyWindow() throws {
     let fired = gate.evaluate(snapshot: snapshot(
         primaryPercent: 95, secondaryPercent: nil, primarySeconds: 604800))
     try expectEqual(fired.count, 1, "long-window threshold fires regardless of field position")
-    try expectTrue(fired[0].message.contains("Weekly"), "label derived from duration")
+    try expectTrue(fired[0].message.contains("周度"), "label derived from duration")
 }
 
 private func testGateRefiresAfterWindowReset() throws {

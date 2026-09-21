@@ -2,37 +2,38 @@ import CodexMeterCore
 import SwiftUI
 
 /// The dropdown panel shown by the menu bar item.
-/// Hierarchy: attention card (most urgent) → window rows → badges →
-/// refresh row → settings (collapsed) → actions.
+/// Compact native styling: quiet captions, one dominant number per window,
+/// opaque semantic background, settings exposed inline.
 struct MenuPanelView: View {
     @ObservedObject var monitor: UsageMonitor
     @AppStorage("pollIntervalSeconds") private var pollInterval = 60
     @AppStorage("notificationsEnabled") private var notificationsEnabled = true
     @State private var now = Date()
-    @State private var settingsExpanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            attentionCard
-            windows
-            badges
-            refreshRow
+        VStack(alignment: .leading, spacing: 0) {
+            header
+
+            if let status = statusItem {
+                statusBanner(status)
+            }
+
+            windowSections
+            infoLines
 
             Divider()
+                .padding(.top, 14)
 
             settings
 
             Divider()
+                .padding(.vertical, 12)
 
-            HStack {
-                Button("打开 Codex") { Self.openCodexApp() }
-                Spacer()
-                Button("退出") { NSApp.terminate(nil) }
-            }
-            .controlSize(.small)
+            bottomBar
         }
-        .padding(14)
-        .frame(width: 310, alignment: .leading)
+        .padding(18)
+        .frame(width: 330, alignment: .leading)
+        .background(Color(NSColor.windowBackgroundColor))
         .onAppear {
             monitor.start()
             monitor.refreshIfStale(maxAge: 20)
@@ -50,29 +51,82 @@ struct MenuPanelView: View {
         }
     }
 
-    // MARK: - Attention card (most urgent state on top)
+    // MARK: - Header
 
-    @ViewBuilder
-    private var attentionCard: some View {
-        if let snapshot = monitor.snapshot {
-            if snapshot.limitReached {
-                card(text: "额度已触顶，等待窗口重置", color: .red)
-            } else if let lowest = presentWindows.min(by: { $0.remainingPercent < $1.remainingPercent }),
-                      lowest.remainingPercent <= 30 {
-                let label = QuotaDisplay.longLabel(seconds: lowest.windowSeconds)
-                card(text: "\(label) 额度剩余 \(lowest.remainingPercent)%，\(resetPhrase(window: lowest))",
-                     color: QuotaThresholds.tier(forRemaining: lowest.remainingPercent) == .critical ? .red : .orange)
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("CodexMeter")
+                .font(.system(size: 13, weight: .semibold))
+            if let plan = monitor.snapshot?.planType {
+                Text(plan.uppercased())
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
             }
+            Spacer()
+            Menu {
+                Button("退出 CodexMeter") { NSApp.terminate(nil) }
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .frame(width: 24, height: 24)
+            .contentShape(Rectangle())
+            .help("更多操作")
+            .accessibilityLabel("更多操作")
+        }
+        .padding(.bottom, 14)
+    }
+
+    // MARK: - Compact status line (errors only; low quota speaks via color)
+
+    private struct StatusItem {
+        let text: String
+        let color: Color
+        let showsRetry: Bool
+    }
+
+    private var statusItem: StatusItem? {
+        switch monitor.authState {
+        case .noAuth:
+            return StatusItem(text: "未登录 · 请在终端运行 codex login", color: .red, showsRetry: false)
+        case .loginExpired:
+            return StatusItem(text: "登录已过期 · 请重新运行 codex login", color: .red, showsRetry: false)
+        case .ok, .unknown:
+            if monitor.snapshot?.limitReached == true {
+                return StatusItem(text: "额度已触顶，等待窗口重置", color: .red, showsRetry: false)
+            }
+            if monitor.lastError != nil, monitor.snapshot != nil {
+                return StatusItem(text: "更新失败 · 数据来自 \(relativeUpdateText)", color: .orange, showsRetry: true)
+            }
+            if monitor.isStale, monitor.snapshot != nil {
+                return StatusItem(text: "数据待更新", color: .orange, showsRetry: false)
+            }
+            return nil
         }
     }
 
-    private func card(text: String, color: Color) -> some View {
-        Text(text)
-            .font(.callout.weight(.medium))
-            .foregroundStyle(color)
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+    private func statusBanner(_ status: StatusItem) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 10))
+                .foregroundStyle(status.color)
+            Text(status.text)
+                .font(.system(size: 12))
+                .foregroundStyle(status.color)
+            Spacer(minLength: 8)
+            if status.showsRetry {
+                Button("重试") {
+                    Task { await monitor.refreshNow() }
+                }
+                .buttonStyle(.link)
+                .font(.system(size: 12))
+            }
+        }
+        .padding(.bottom, 12)
     }
 
     // MARK: - Windows
@@ -84,214 +138,207 @@ struct MenuPanelView: View {
     }
 
     @ViewBuilder
-    private var windows: some View {
-        switch monitor.authState {
-        case .noAuth:
-            VStack(alignment: .leading, spacing: 6) {
-                Text("未找到 Codex 登录").font(.headline)
-                Text("请在终端运行 `codex login`，或打开 Codex app 登录后重试。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        case .loginExpired:
-            VStack(alignment: .leading, spacing: 6) {
-                Text("登录已过期").font(.headline).foregroundStyle(.red)
-                Text("请重新运行 `codex login`，本工具会自动恢复。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        case .unknown, .ok:
-            let windows = presentWindows
-            if windows.isEmpty {
-                if monitor.isRefreshing {
-                    HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
-                        Text("获取用量中…").font(.callout).foregroundStyle(.secondary)
-                    }
-                } else if let error = monitor.lastError {
-                    Text(error).font(.callout).foregroundStyle(.secondary)
-                } else {
-                    Text("暂无数据").font(.callout).foregroundStyle(.secondary)
+    private var windowSections: some View {
+        let windows = presentWindows
+        if windows.isEmpty {
+            if monitor.isRefreshing {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.mini)
+                    Text("获取用量中…")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                 }
-            } else {
+                .padding(.bottom, 12)
+            }
+        } else {
+            VStack(spacing: 14) {
                 ForEach(windows, id: \.windowSeconds) { window in
-                    windowRow(window: window)
+                    windowSection(window)
                 }
             }
         }
     }
 
-    private func windowRow(window: UsageWindow) -> some View {
+    private func windowSection(_ window: UsageWindow) -> some View {
         let remaining = window.remainingPercent
         let tier = QuotaThresholds.tier(forRemaining: remaining)
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(QuotaDisplay.longLabel(seconds: window.windowSeconds))
-                    .font(.headline)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(QuotaDisplay.longLabel(seconds: window.windowSeconds))
+                        .font(.system(size: 13, weight: .medium))
+                    Text("剩余")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
-                Text("剩余 \(remaining)%")
-                    .font(.title3.weight(.semibold))
+                Text("\(remaining)%")
+                    .font(.system(size: 27, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(Self.color(for: tier))
             }
-            ProgressView(value: Double(remaining), total: 100)
-            Text("重置于 \(Self.resetTimeText(window))（\(Self.resetLeadText(window, now: now))）")
-                .font(.caption)
+
+            quotaBar(fraction: Double(remaining) / 100, color: Self.color(for: tier))
+
+            Text(QuotaDisplay.resetText(resetAt: window.resetAt, now: now))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
+                .help(Self.fullDateTime(window.resetAt))
         }
     }
 
-    private func resetPhrase(window: UsageWindow) -> String {
-        if window.windowSeconds <= 86400 {
-            return Self.resetLeadText(window, now: now).appending("重置")
-        }
-        return "\(Self.resetTimeText(window))重置"
-    }
-
-    static func resetTimeText(_ window: UsageWindow) -> String {
-        let formatter = DateFormatter()
-        formatter.setLocalizedDateFormatFromTemplate(window.windowSeconds <= 86400 ? "HH:mm" : "MMMd")
-        return formatter.string(from: window.resetAt)
-    }
-
-    /// Short window → live countdown; long window → absolute lead time.
-    static func resetLeadText(_ window: UsageWindow, now: Date) -> String {
-        let remaining = window.resetAt.timeIntervalSince(now)
-        if remaining <= 0 { return "即将重置" }
-        return "剩余 \(countdown(remaining))"
-    }
-
-    static func countdown(_ interval: TimeInterval) -> String {
-        let total = Int(interval.rounded())
-        let hours = total / 3600, minutes = (total % 3600) / 60, seconds = total % 60
-        if hours > 0 { return String(format: "%dh%02dm", hours, minutes) }
-        if minutes > 0 { return String(format: "%dm%02ds", minutes, seconds) }
-        return "\(seconds)s"
-    }
-
-    // MARK: - Badges
-
-    @ViewBuilder
-    private var badges: some View {
-        if let snapshot = monitor.snapshot {
-            HStack(spacing: 6) {
-                if let plan = snapshot.planType {
-                    Badge(text: plan.uppercased(), color: .accentColor)
-                }
-                if snapshot.limitReached {
-                    Badge(text: "已触顶", color: .red)
-                }
-                if snapshot.resetCreditsAvailable > 0 {
-                    Badge(text: "\(snapshot.resetCreditsAvailable) 次可用重置", color: .indigo)
-                }
-                if snapshot.hasCredits {
-                    Badge(text: "Credits $\(snapshot.creditBalance)", color: .green)
-                }
+    private func quotaBar(fraction: Double, color: Color) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.primary.opacity(0.08))
+                Capsule()
+                    .fill(color)
+                    .frame(width: max(0, min(1, fraction)) * geo.size.width)
             }
         }
+        .frame(height: 5)
     }
 
-    // MARK: - Refresh state row
+    // MARK: - Quiet info lines (only when present)
 
-    private var refreshRow: some View {
+    @ViewBuilder
+    private var infoLines: some View {
+        if let snapshot = monitor.snapshot {
+            VStack(alignment: .leading, spacing: 4) {
+                if snapshot.resetCreditsAvailable > 0 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                        Text("\(snapshot.resetCreditsAvailable) 次可用重置")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if snapshot.hasCredits {
+                    Text("Credits $\(snapshot.creditBalance)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+            .padding(.top, 12)
+        }
+    }
+
+    // MARK: - Settings (exposed inline)
+
+    private var settings: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("轮询间隔", selection: $pollInterval) {
+                ForEach(AppSettings.pollIntervalOptions, id: \.self) { option in
+                    Text(AppSettings.label(forInterval: option)).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .controlSize(.small)
+
+            Toggle("用量阈值通知", isOn: $notificationsEnabled)
+
+            if LoginItem.isSupported {
+                Toggle("开机自启", isOn: Binding(
+                    get: { LoginItem.isEnabled },
+                    set: { _ = LoginItem.setEnabled($0) }))
+            }
+        }
+        .font(.system(size: 12))
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .padding(.top, 12)
+    }
+
+    // MARK: - Bottom bar
+
+    private var bottomBar: some View {
         HStack(spacing: 8) {
+            Text(updateText)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+
             Button {
                 Task { await monitor.refreshNow() }
             } label: {
-                if monitor.isRefreshing {
-                    ProgressView().controlSize(.mini)
-                } else {
-                    Image(systemName: "arrow.clockwise")
-                }
-            }
-            .buttonStyle(.borderless)
-            .disabled(monitor.isRefreshing)
-            .help("立即刷新")
-
-            Text(dataFreshnessText)
-                .font(.caption)
-                .foregroundStyle(dataFreshnessColor)
-                .monospacedDigit()
-
-            Spacer()
-        }
-    }
-
-    private var dataFreshnessText: String {
-        if monitor.lastError != nil, monitor.snapshot != nil {
-            return "更新失败，数据来自 \(Self.countdown(now.timeIntervalSince(monitor.lastRefresh ?? now)))前"
-        }
-        if monitor.isStale {
-            return "数据待更新"
-        }
-        guard let lastRefresh = monitor.lastRefresh else { return "尚未刷新" }
-        let seconds = Int(now.timeIntervalSince(lastRefresh))
-        if seconds < 5 { return "刚刚刷新" }
-        if seconds < 90 { return "\(seconds) 秒前刷新" }
-        return "上次刷新 \(Self.countdown(TimeInterval(seconds)))前"
-    }
-
-    private var dataFreshnessColor: Color {
-        (monitor.lastError != nil && monitor.snapshot != nil) || monitor.isStale ? .orange : .secondary
-    }
-
-    // MARK: - Settings (collapsed)
-
-    private var settings: some View {
-        DisclosureGroup("设置", isExpanded: $settingsExpanded) {
-            VStack(alignment: .leading, spacing: 8) {
-                Picker("轮询间隔", selection: $pollInterval) {
-                    ForEach(AppSettings.pollIntervalOptions, id: \.self) { option in
-                        Text(AppSettings.label(forInterval: option)).tag(option)
+                Group {
+                    if monitor.isRefreshing {
+                        ProgressView().controlSize(.mini)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11))
                     }
                 }
-                .pickerStyle(.segmented)
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .disabled(monitor.isRefreshing)
+            .help("立即刷新")
+            .accessibilityLabel("立即刷新")
 
-                Toggle("用量阈值通知", isOn: $notificationsEnabled)
+            Spacer()
 
-                if LoginItem.isSupported {
-                    Toggle("开机自启", isOn: Binding(
-                        get: { LoginItem.isEnabled },
-                        set: { _ = LoginItem.setEnabled($0) }))
+            Button {
+                Self.openCodexApp()
+            } label: {
+                HStack(spacing: 3) {
+                    Text("打开 Codex")
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 10))
                 }
             }
-            .padding(.top, 8)
+            .buttonStyle(.link)
+            .font(.system(size: 12))
         }
-        .font(.callout)
-        .toggleStyle(.switch)
-        .controlSize(.small)
     }
 
-    // MARK: - Helpers
+    // MARK: - Text helpers
+
+    private var updateText: String {
+        guard monitor.lastRefresh != nil else { return "尚未更新" }
+        if monitor.lastError != nil || monitor.isStale {
+            return "上次成功更新 \(relativeUpdateText)"
+        }
+        return relativeUpdateText == "刚刚" ? "刚刚更新" : "\(relativeUpdateText)更新"
+    }
+
+    /// "刚刚" / "42 秒前" / "3 分钟前" / "1 天 2 小时前" — success-time age.
+    private var relativeUpdateText: String {
+        guard let lastRefresh = monitor.lastRefresh else { return "—" }
+        let age = now.timeIntervalSince(lastRefresh)
+        if age < 5 { return "刚刚" }
+        let total = Int(age.rounded())
+        if total < 60 { return "\(total) 秒前" }
+        let minutes = total / 60
+        if minutes < 60 { return "\(minutes) 分钟前" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours) 小时 \(minutes % 60) 分前" }
+        return "\(hours / 24) 天 \(hours % 24) 小时前"
+    }
 
     static func color(for tier: QuotaTier) -> Color {
         switch tier {
         case .critical: .red
         case .warning: .orange
-        case .normal: .primary
+        case .normal: .accentColor
         }
+    }
+
+    static func fullDateTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("MMMd HH:mm")
+        return formatter.string(from: date)
     }
 
     static func openCodexApp() {
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") {
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
         }
-    }
-}
-
-private struct Badge: View {
-    let text: String
-    let color: Color
-
-    var body: some View {
-        Text(text)
-            .font(.caption2.weight(.medium))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.15), in: Capsule())
-            .foregroundStyle(color)
     }
 }

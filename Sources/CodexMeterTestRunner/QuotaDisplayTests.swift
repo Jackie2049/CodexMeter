@@ -37,11 +37,11 @@ private func testQuotaTierBoundaries() throws {
 // MARK: - dynamic window labels
 
 private func testWindowLabels() throws {
-    try expectEqual(QuotaDisplay.shortLabel(seconds: 18000), "5h", "5h short")
-    try expectEqual(QuotaDisplay.shortLabel(seconds: 604800), "Weekly", "week short")
+    try expectEqual(QuotaDisplay.shortLabel(seconds: 18000), "5小时", "5h short")
+    try expectEqual(QuotaDisplay.shortLabel(seconds: 604800), "周度", "week short")
     try expectEqual(QuotaDisplay.shortLabel(seconds: 3600), "窗口", "unknown short")
-    try expectEqual(QuotaDisplay.longLabel(seconds: 18000), "5 小时", "5h long")
-    try expectEqual(QuotaDisplay.longLabel(seconds: 604800), "Weekly", "week long")
+    try expectEqual(QuotaDisplay.longLabel(seconds: 18000), "5小时", "5h long")
+    try expectEqual(QuotaDisplay.longLabel(seconds: 604800), "周度", "week long")
     try expectEqual(QuotaDisplay.longLabel(seconds: 3600), "窗口", "unknown long")
 }
 
@@ -52,7 +52,7 @@ private func testStatusBarTextPlusShape() throws {
     let snap = snapshot(
         primary: window(used: 33, seconds: 18000),
         secondary: window(used: 5, seconds: 604800))
-    try expectEqual(QuotaDisplay.statusBarText(snap), "5h 67% · Weekly 95%", "plus shape")
+    try expectEqual(QuotaDisplay.statusBarText(snap), "5小时 67% · 周度 95%", "plus shape")
 }
 
 private func testStatusBarTextProShapeSingleWindow() throws {
@@ -60,14 +60,14 @@ private func testStatusBarTextProShapeSingleWindow() throws {
     let snap = snapshot(
         primary: window(used: 0, seconds: 604800),
         secondary: nil)
-    try expectEqual(QuotaDisplay.statusBarText(snap), "5h — · Weekly 100%", "pro shape, missing 5h slot")
+    try expectEqual(QuotaDisplay.statusBarText(snap), "5小时 — · 周度 100%", "pro shape, missing 5h slot")
 }
 
 private func testStatusBarTextMissingWeeklySlot() throws {
     let snap = snapshot(
         primary: window(used: 33, seconds: 18000),
         secondary: nil)
-    try expectEqual(QuotaDisplay.statusBarText(snap), "5h 67% · Weekly —", "missing weekly slot")
+    try expectEqual(QuotaDisplay.statusBarText(snap), "5小时 67% · 周度 —", "missing weekly slot")
 }
 
 private func testStatusBarTextNoWindows() throws {
@@ -80,7 +80,36 @@ private func testStatusBarTextIgnoresLimitReached() throws {
         primary: window(used: 100, seconds: 18000),
         secondary: window(used: 50, seconds: 604800),
         limitReached: true)
-    try expectEqual(QuotaDisplay.statusBarText(reached), "5h 0% · Weekly 50%", "limitReached keeps numbers")
+    try expectEqual(QuotaDisplay.statusBarText(reached), "5小时 0% · 周度 50%", "limitReached keeps numbers")
+}
+
+// MARK: - natural-Chinese reset countdown
+
+private func testResetTextNaturalChinese() throws {
+    let now = Date(timeIntervalSince1970: 1_000_000)
+
+    try expectEqual(
+        QuotaDisplay.resetText(resetAt: now.addingTimeInterval(6 * 86400 + 13 * 3600), now: now),
+        "6 天 13 小时后重置", "days + hours")
+    try expectEqual(
+        QuotaDisplay.resetText(resetAt: now.addingTimeInterval(48 * 3600), now: now),
+        "2 天后重置", "whole days drop hours")
+    try expectEqual(
+        QuotaDisplay.resetText(resetAt: now.addingTimeInterval(3 * 3600 + 5 * 60), now: now),
+        "3 小时 5 分后重置", "hours + minutes")
+    try expectEqual(
+        QuotaDisplay.resetText(resetAt: now.addingTimeInterval(42 * 60), now: now),
+        "42 分后重置", "minutes only")
+    try expectEqual(
+        QuotaDisplay.resetText(resetAt: now.addingTimeInterval(30), now: now),
+        "1 分后重置", "under a minute rounds up, no seconds shown")
+}
+
+private func testResetTextZeroMeansWaitingNotRecovered() throws {
+    let now = Date(timeIntervalSince1970: 1_000_000)
+    // Countdown at zero is NOT recovery — only a fresh snapshot confirms it.
+    try expectEqual(QuotaDisplay.resetText(resetAt: now, now: now), "等待更新", "at zero")
+    try expectEqual(QuotaDisplay.resetText(resetAt: now.addingTimeInterval(-60), now: now), "等待更新", "past zero")
 }
 
 let quotaDisplayTests: [TestEntry] = [
@@ -92,4 +121,6 @@ let quotaDisplayTests: [TestEntry] = [
     TestEntry(name: "QuotaDisplay.statusBarMissingWeekly", run: sync(testStatusBarTextMissingWeeklySlot)),
     TestEntry(name: "QuotaDisplay.statusBarNoWindows", run: sync(testStatusBarTextNoWindows)),
     TestEntry(name: "QuotaDisplay.statusBarIgnoresLimitReached", run: sync(testStatusBarTextIgnoresLimitReached)),
+    TestEntry(name: "QuotaDisplay.resetTextNaturalChinese", run: sync(testResetTextNaturalChinese)),
+    TestEntry(name: "QuotaDisplay.resetTextZeroMeansWaiting", run: sync(testResetTextZeroMeansWaitingNotRecovered)),
 ]
