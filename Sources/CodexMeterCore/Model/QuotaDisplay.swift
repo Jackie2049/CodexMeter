@@ -31,7 +31,7 @@ public enum QuotaDisplay {
     public static func shortLabel(seconds: Int) -> String {
         switch seconds {
         case fiveHoursSeconds: "5h"
-        case weekSeconds: "周"
+        case weekSeconds: "Weekly"
         default: "窗口"
         }
     }
@@ -39,7 +39,7 @@ public enum QuotaDisplay {
     public static func longLabel(seconds: Int) -> String {
         switch seconds {
         case fiveHoursSeconds: "5 小时"
-        case weekSeconds: "1 周"
+        case weekSeconds: "Weekly"
         default: "窗口"
         }
     }

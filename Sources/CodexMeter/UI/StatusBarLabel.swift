@@ -10,6 +10,8 @@ struct StatusBarLabel: View {
 
     var body: some View {
         HStack(spacing: 3) {
+            Text("Codex")
+                .font(.system(size: 11, weight: .semibold))
             Image(systemName: icon)
             Text(text)
                 .monospacedDigit()

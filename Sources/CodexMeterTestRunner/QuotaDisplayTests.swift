@@ -38,10 +38,10 @@ private func testQuotaTierBoundaries() throws {
 
 private func testWindowLabels() throws {
     try expectEqual(QuotaDisplay.shortLabel(seconds: 18000), "5h", "5h short")
-    try expectEqual(QuotaDisplay.shortLabel(seconds: 604800), "周", "week short")
+    try expectEqual(QuotaDisplay.shortLabel(seconds: 604800), "Weekly", "week short")
     try expectEqual(QuotaDisplay.shortLabel(seconds: 3600), "窗口", "unknown short")
     try expectEqual(QuotaDisplay.longLabel(seconds: 18000), "5 小时", "5h long")
-    try expectEqual(QuotaDisplay.longLabel(seconds: 604800), "1 周", "week long")
+    try expectEqual(QuotaDisplay.longLabel(seconds: 604800), "Weekly", "week long")
     try expectEqual(QuotaDisplay.longLabel(seconds: 3600), "窗口", "unknown long")
 }
 
@@ -52,7 +52,7 @@ private func testStatusBarTextPlusShape() throws {
     let snap = snapshot(
         primary: window(used: 33, seconds: 18000),
         secondary: window(used: 5, seconds: 604800))
-    try expectEqual(QuotaDisplay.statusBarText(snap), "5h 67% · 周 95%", "plus shape")
+    try expectEqual(QuotaDisplay.statusBarText(snap), "5h 67% · Weekly 95%", "plus shape")
 }
 
 private func testStatusBarTextProShapeSingleWindow() throws {
@@ -60,14 +60,14 @@ private func testStatusBarTextProShapeSingleWindow() throws {
     let snap = snapshot(
         primary: window(used: 0, seconds: 604800),
         secondary: nil)
-    try expectEqual(QuotaDisplay.statusBarText(snap), "5h — · 周 100%", "pro shape, missing 5h slot")
+    try expectEqual(QuotaDisplay.statusBarText(snap), "5h — · Weekly 100%", "pro shape, missing 5h slot")
 }
 
 private func testStatusBarTextMissingWeeklySlot() throws {
     let snap = snapshot(
         primary: window(used: 33, seconds: 18000),
         secondary: nil)
-    try expectEqual(QuotaDisplay.statusBarText(snap), "5h 67% · 周 —", "missing weekly slot")
+    try expectEqual(QuotaDisplay.statusBarText(snap), "5h 67% · Weekly —", "missing weekly slot")
 }
 
 private func testStatusBarTextNoWindows() throws {
@@ -80,7 +80,7 @@ private func testStatusBarTextIgnoresLimitReached() throws {
         primary: window(used: 100, seconds: 18000),
         secondary: window(used: 50, seconds: 604800),
         limitReached: true)
-    try expectEqual(QuotaDisplay.statusBarText(reached), "5h 0% · 周 50%", "limitReached keeps numbers")
+    try expectEqual(QuotaDisplay.statusBarText(reached), "5h 0% · Weekly 50%", "limitReached keeps numbers")
 }
 
 let quotaDisplayTests: [TestEntry] = [

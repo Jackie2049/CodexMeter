@@ -60,7 +60,7 @@ struct MenuPanelView: View {
             } else if let lowest = presentWindows.min(by: { $0.remainingPercent < $1.remainingPercent }),
                       lowest.remainingPercent <= 30 {
                 let label = QuotaDisplay.longLabel(seconds: lowest.windowSeconds)
-                card(text: "\(label)额度剩余 \(lowest.remainingPercent)%，\(resetPhrase(window: lowest))",
+                card(text: "\(label) 额度剩余 \(lowest.remainingPercent)%，\(resetPhrase(window: lowest))",
                      color: QuotaThresholds.tier(forRemaining: lowest.remainingPercent) == .critical ? .red : .orange)
             }
         }

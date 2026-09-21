@@ -53,7 +53,7 @@ public final class NotificationGate {
         let label = QuotaDisplay.longLabel(seconds: window.windowSeconds)
         let resetText = Self.resetText(resetAt: window.resetAt, windowSeconds: window.windowSeconds)
         return UsageAlert(
-            message: "Codex \(label)窗口额度剩余 \(window.remainingPercent)%，\(resetText)重置",
+            message: "Codex \(label) 额度剩余 \(window.remainingPercent)%，\(resetText)重置",
             dedupKey: key)
     }
 
