@@ -61,14 +61,17 @@ final class StatusItemController: NSObject {
             now: Date())
 
         // Two stacked lines (iStat-style): quota row on top, reset row below.
-        // The newline glyph gets a tiny font so the rows sit tight.
+        // Sizes are budgeted so both rows fit the ~24pt menu bar and the
+        // button centers the block instead of clipping its top. Both rows
+        // use labelColor — secondaryLabelColor resolves near-invisible on
+        // the dark menu bar.
         let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 1
+        paragraph.lineSpacing = 0.5
 
         let attributed = NSMutableAttributedString(
             string: components.main,
             attributes: [
-                .font: NSFont.systemFont(ofSize: 11),
+                .font: NSFont.systemFont(ofSize: 9.5),
                 .paragraphStyle: paragraph,
                 .foregroundColor: NSColor.labelColor,
             ])
@@ -76,13 +79,13 @@ final class StatusItemController: NSObject {
         if let resets = components.resets {
             attributed.append(NSAttributedString(
                 string: "\n",
-                attributes: [.font: NSFont.systemFont(ofSize: 3), .paragraphStyle: paragraph]))
+                attributes: [.font: NSFont.systemFont(ofSize: 8), .paragraphStyle: paragraph]))
             attributed.append(NSAttributedString(
                 string: resets,
                 attributes: [
-                    .font: NSFont.systemFont(ofSize: 9),
+                    .font: NSFont.systemFont(ofSize: 8),
                     .paragraphStyle: paragraph,
-                    .foregroundColor: NSColor.secondaryLabelColor,
+                    .foregroundColor: NSColor.labelColor,
                 ]))
         }
         statusItem.button?.attributedTitle = attributed
