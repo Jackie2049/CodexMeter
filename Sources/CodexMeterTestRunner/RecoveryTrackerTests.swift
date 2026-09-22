@@ -47,10 +47,25 @@ private func testReentryAfterRecovery() throws {
     try expectEqual(tracker.record(limitReached: false), RecoveryEvent.recovered, "second recovery fires once")
 }
 
+private func testUnknownFieldDoesNotFalselyRecover() throws {
+    let tracker = makeTracker("rec-\(UUID().uuidString)")
+    _ = tracker.record(limitReached: true)
+
+    // Missing limit_reached field (parse gaps): neither a recovery nor a
+    // state change — the episode stays armed for the next confirmed read.
+    try expectNil(tracker.record(limitReached: nil), "unknown → no event")
+    try expectNil(tracker.record(limitReached: nil), "unknown repeatedly → still no event")
+
+    // Fresh confirmed data still recovers exactly once.
+    try expectEqual(tracker.record(limitReached: false), RecoveryEvent.recovered, "recovery after unknown gap")
+    try expectNil(tracker.record(limitReached: false), "no duplicate recovery")
+}
+
 let recoveryTrackerTests: [TestEntry] = [
     TestEntry(name: "RecoveryTracker.noEventOnHealthyStart", run: sync(testNoEventOnHealthyStart)),
     TestEntry(name: "RecoveryTracker.transitions", run: sync(testEnteredThenRecoveredTransitions)),
     TestEntry(name: "RecoveryTracker.recoveryNeedsNewData", run: sync(testRecoveryRequiresConfirmedNewData)),
     TestEntry(name: "RecoveryTracker.survivesRestart", run: sync(testSurvivesRestart)),
     TestEntry(name: "RecoveryTracker.reentry", run: sync(testReentryAfterRecovery)),
+    TestEntry(name: "RecoveryTracker.unknownFieldNoFalseRecovery", run: sync(testUnknownFieldDoesNotFalselyRecover)),
 ]

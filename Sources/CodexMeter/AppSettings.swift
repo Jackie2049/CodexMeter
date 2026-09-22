@@ -24,6 +24,16 @@ enum AppSettings {
         UserDefaults.standard.object(forKey: "notificationsEnabled") as? Bool ?? true
     }
 
+    /// 独立于阈值通知的“重置提醒”开关，只控制额度恢复通知。
+    static var resetReminderEnabled: Bool {
+        UserDefaults.standard.object(forKey: "resetReminderEnabled") as? Bool ?? true
+    }
+
+    /// 任一通知开关开启即需要系统通知权限；两者都关闭则不请求。
+    static var shouldRequestNotificationPermission: Bool {
+        notificationsEnabled || resetReminderEnabled
+    }
+
     // MARK: - Menu bar layout
 
     /// Vertical offset (pt) of the status item's two-line block relative to

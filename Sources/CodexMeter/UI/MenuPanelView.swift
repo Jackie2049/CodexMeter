@@ -8,6 +8,7 @@ struct MenuPanelView: View {
     @ObservedObject var monitor: UsageMonitor
     @AppStorage("pollIntervalSeconds") private var pollInterval = 60
     @AppStorage("notificationsEnabled") private var notificationsEnabled = true
+    @AppStorage("resetReminderEnabled") private var resetReminderEnabled = true
     @State private var now = Date()
 
     var body: some View {
@@ -42,6 +43,9 @@ struct MenuPanelView: View {
             }
         }
         .onChange(of: notificationsEnabled) { _, enabled in
+            if enabled { NotificationManager.shared.requestAuthorizationIfNeeded() }
+        }
+        .onChange(of: resetReminderEnabled) { _, enabled in
             if enabled { NotificationManager.shared.requestAuthorizationIfNeeded() }
         }
     }
@@ -83,6 +87,7 @@ struct MenuPanelView: View {
             }
             .pickerStyle(.inline)
             Toggle("用量阈值通知", isOn: $notificationsEnabled)
+            Toggle("重置提醒", isOn: $resetReminderEnabled)
             if LoginItem.isSupported {
                 Toggle("开机自启", isOn: Binding(
                     get: { LoginItem.isEnabled },

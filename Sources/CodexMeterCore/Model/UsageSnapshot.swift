@@ -15,17 +15,22 @@ public struct UsageWindow: Equatable, Sendable {
 public struct UsageSnapshot: Equatable, Sendable {
     public let planType: String?
     public let limitReached: Bool
+    /// True only when the payload actually carried `limit_reached`. A
+    /// missing field must not read as a confirmed "not reached" — the
+    /// recovery tracker relies on this distinction.
+    public let limitReachedKnown: Bool
     public let primary: UsageWindow?
     public let secondary: UsageWindow?
     public let resetCreditsAvailable: Int
     public let hasCredits: Bool
     public let creditBalance: String
 
-    public init(planType: String?, limitReached: Bool,
+    public init(planType: String?, limitReached: Bool, limitReachedKnown: Bool = false,
                 primary: UsageWindow?, secondary: UsageWindow?,
                 resetCreditsAvailable: Int, hasCredits: Bool, creditBalance: String) {
         self.planType = planType
         self.limitReached = limitReached
+        self.limitReachedKnown = limitReachedKnown
         self.primary = primary
         self.secondary = secondary
         self.resetCreditsAvailable = resetCreditsAvailable
@@ -92,6 +97,7 @@ private extension UsageResponse {
         return UsageSnapshot(
             planType: planType,
             limitReached: rateLimit?.limitReached ?? false,
+            limitReachedKnown: rateLimit?.limitReached != nil,
             primary: window(rateLimit?.primaryWindow),
             secondary: window(rateLimit?.secondaryWindow),
             resetCreditsAvailable: rateLimitResetCredits?.availableCount ?? 0,

@@ -79,8 +79,22 @@ private func testToleratesMissingOptionalFields() throws {
     try expectTrue(snapshot.creditBalance.isEmpty, "creditBalance")
 }
 
+private func testLimitReachedKnownFlag() throws {
+    // Field present (even when false) → known.
+    let known = try UsageSnapshot.parse(
+        Data(#"{"rate_limit": {"allowed": true, "limit_reached": false}}"#.utf8))
+    try expectTrue(known.limitReachedKnown, "present limit_reached is known")
+
+    // rate_limit object missing entirely → unknown; display still defaults
+    // to false, but the recovery tracker must not read it as confirmed.
+    let unknown = try UsageSnapshot.parse(Data(#"{"plan_type": "plus"}"#.utf8))
+    try expectTrue(unknown.limitReachedKnown == false, "missing field is unknown")
+    try expectTrue(unknown.limitReached == false, "display default stays false")
+}
+
 let snapshotTests: [TestEntry] = [
     TestEntry(name: "UsageSnapshot.parsesRealResponseFixture", run: sync(testParsesRealResponseFixture)),
     TestEntry(name: "UsageSnapshot.parsesLimitReachedAndCredits", run: sync(testParsesLimitReachedAndCredits)),
     TestEntry(name: "UsageSnapshot.toleratesMissingOptionalFields", run: sync(testToleratesMissingOptionalFields)),
+    TestEntry(name: "UsageSnapshot.limitReachedKnownFlag", run: sync(testLimitReachedKnownFlag)),
 ]

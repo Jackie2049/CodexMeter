@@ -162,16 +162,27 @@ final class UsageMonitor: ObservableObject {
             NSLog("CodexMeter refresh: primary=%d%% secondary=%d%% plan=%@", primary.usedPercent, secondary.usedPercent, fresh.planType ?? "-")
         }
 
+        // Recovery tracking runs on every successful refresh, independent
+        // of both notification toggles — state stays truthful while
+        // notifications are off, and re-enabling never backfills events
+        // that already passed. A payload without limit_reached is unknown:
+        // neither an episode nor a recovery.
+        let reached: Bool? = fresh.limitReachedKnown ? fresh.limitReached : nil
+        let recoveryEvent = recoveryTracker.record(limitReached: reached)
+
         // Threshold alerts, merged into a single notification per refresh.
         if AppSettings.notificationsEnabled {
             let alerts = gate.evaluate(snapshot: fresh)
             if !alerts.isEmpty {
                 NotificationManager.shared.deliver(message: alerts.map(\.message).joined(separator: "；"))
             }
-            // Recovery only counts when confirmed by this fresh snapshot.
-            if recoveryTracker.record(limitReached: fresh.limitReached) == .recovered {
-                NotificationManager.shared.deliver(message: "Codex 额度已恢复（已确认新数据）")
-            }
+        }
+
+        // 恢复通知只受“重置提醒”开关控制；同一次触顶只通知一次
+        //（状态由 RecoveryTracker 持久化推进，不会重复触发）。
+        if recoveryEvent == .recovered, AppSettings.resetReminderEnabled {
+            NotificationManager.shared.deliver(title: "Codex 额度已恢复",
+                                               body: "可以继续使用 Codex 了。")
         }
     }
 

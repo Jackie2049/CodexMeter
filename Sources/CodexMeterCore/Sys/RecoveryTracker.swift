@@ -21,8 +21,13 @@ public final class RecoveryTracker {
         self.key = key
     }
 
+    /// Tracks the limit flag across confirmed snapshots. `nil` means the
+    /// payload didn't carry a usable `limit_reached` — that is neither a
+    /// limit episode nor a recovery: no event fires and no state changes,
+    /// so parse gaps can never fabricate a recovery.
     @discardableResult
-    public func record(limitReached: Bool) -> RecoveryEvent? {
+    public func record(limitReached: Bool?) -> RecoveryEvent? {
+        guard let limitReached else { return nil }
         let wasLimitReached = defaults.bool(forKey: key)
         defer { defaults.set(limitReached, forKey: key) }
 

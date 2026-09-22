@@ -22,7 +22,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
     /// Ask once, on first launch; remembers the answer.
     func requestAuthorizationIfNeeded() {
-        guard isAvailable, AppSettings.notificationsEnabled else { return }
+        guard isAvailable, AppSettings.shouldRequestNotificationPermission else { return }
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert]) { [weak self] granted, _ in
             self?.authorized = granted
@@ -30,10 +30,14 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     }
 
     func deliver(message: String) {
+        deliver(title: "CodexMeter", body: message)
+    }
+
+    func deliver(title: String, body: String) {
         guard isAvailable, authorized != false else { return }
         let content = UNMutableNotificationContent()
-        content.title = "CodexMeter"
-        content.body = message
+        content.title = title
+        content.body = body
         let request = UNNotificationRequest(
             identifier: "codexmeter.\(UUID().uuidString)",
             content: content,
