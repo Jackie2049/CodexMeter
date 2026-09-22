@@ -61,10 +61,11 @@ final class StatusItemController: NSObject {
             now: Date())
 
         // Two stacked lines (iStat-style): quota row on top, reset row below.
-        // Sizes are budgeted so both rows fit the ~24pt menu bar and the
-        // button centers the block instead of clipping its top. Both rows
-        // use labelColor — secondaryLabelColor resolves near-invisible on
-        // the dark menu bar.
+        // Sizes are budgeted so both rows fit the ~24pt menu bar. NSStatusBar
+        // centers single-line metrics, so multi-line blocks ride high — a
+        // negative baselineOffset nudges the whole block down. Both rows use
+        // labelColor: secondaryLabelColor resolves near-invisible on the dark
+        // menu bar.
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = 0.5
 
@@ -74,18 +75,24 @@ final class StatusItemController: NSObject {
                 .font: NSFont.systemFont(ofSize: 9.5),
                 .paragraphStyle: paragraph,
                 .foregroundColor: NSColor.labelColor,
+                .baselineOffset: -2.5,
             ])
 
         if let resets = components.resets {
             attributed.append(NSAttributedString(
                 string: "\n",
-                attributes: [.font: NSFont.systemFont(ofSize: 8), .paragraphStyle: paragraph]))
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: 8),
+                    .paragraphStyle: paragraph,
+                    .baselineOffset: -2.5,
+                ]))
             attributed.append(NSAttributedString(
                 string: resets,
                 attributes: [
                     .font: NSFont.systemFont(ofSize: 8),
                     .paragraphStyle: paragraph,
                     .foregroundColor: NSColor.labelColor,
+                    .baselineOffset: -2.5,
                 ]))
         }
         statusItem.button?.attributedTitle = attributed
