@@ -88,12 +88,6 @@ struct MenuPanelView: View {
                     get: { LoginItem.isEnabled },
                     set: { _ = LoginItem.setEnabled($0) }))
             }
-            Menu("菜单栏偏移 (\(String(format: "%.1f", AppSettings.menuBarBaselineOffset))pt)") {
-                Button("上移 1pt") { AppSettings.adjustMenuBarBaselineOffset(1) }
-                Button("下移 1pt") { AppSettings.adjustMenuBarBaselineOffset(-1) }
-                Divider()
-                Button("恢复默认") { AppSettings.resetMenuBarBaselineOffset() }
-            }
             Divider()
             Button("退出 CodexMeter") { NSApp.terminate(nil) }
         } label: {

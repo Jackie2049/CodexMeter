@@ -60,13 +60,6 @@ final class StatusItemController: NSObject {
             }
             return event
         }
-
-        NotificationCenter.default.addObserver(
-            forName: AppSettings.menuBarOffsetChanged,
-            object: nil,
-            queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.render() }
-        }
     }
 
     private func dismissPopoverIfShown() {

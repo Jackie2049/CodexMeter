@@ -27,27 +27,13 @@ enum AppSettings {
     // MARK: - Menu bar layout
 
     /// Vertical baseline offset (pt) for the two-line status item. NSStatusBar
-    /// centers single-line metrics, so multi-line blocks ride high; this lets
-    /// the user dial the position in for their display instead of us guessing.
-    static let menuBarBaselineOffsetDefault = -6.5
+    /// centers single-line metrics, so multi-line blocks ride high; fixed at
+    /// -9.5pt by default, overridable via
+    /// `defaults write com.jackie.CodexMeter menuBarBaselineOffset -float <pt>`.
+    static let menuBarBaselineOffsetDefault = -9.5
 
     static var menuBarBaselineOffset: Double {
-        get {
-            UserDefaults.standard.object(forKey: "menuBarBaselineOffset") as? Double
-                ?? menuBarBaselineOffsetDefault
-        }
-        set { UserDefaults.standard.set(newValue, forKey: "menuBarBaselineOffset") }
-    }
-
-    static let menuBarOffsetChanged = Notification.Name("codexMeterMenuBarOffsetChanged")
-
-    static func adjustMenuBarBaselineOffset(_ delta: Double) {
-        menuBarBaselineOffset += delta
-        NotificationCenter.default.post(name: menuBarOffsetChanged, object: nil)
-    }
-
-    static func resetMenuBarBaselineOffset() {
-        menuBarBaselineOffset = menuBarBaselineOffsetDefault
-        NotificationCenter.default.post(name: menuBarOffsetChanged, object: nil)
+        UserDefaults.standard.object(forKey: "menuBarBaselineOffset") as? Double
+            ?? menuBarBaselineOffsetDefault
     }
 }
