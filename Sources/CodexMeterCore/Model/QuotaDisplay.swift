@@ -88,11 +88,14 @@ public enum QuotaDisplay {
         public let brand: String
         /// Quota text: "5小时 97% · 周度 83%" / "未登录" / "–".
         public let quota: String
+        /// SF Symbol trailing the quota row: bolt normally, warning triangle
+        /// when the limit is reached; nil without live data.
+        public let symbolName: String?
         /// Bottom line (nil when nothing to show): "↻ 2 小时 48 分后 · 6 天 13 小时后".
         public let resets: String?
     }
 
-    /// Status item content: brand leftmost, quota + reset rows stacked to
+    /// Status item content: logo leftmost, quota + reset rows stacked to
     /// its right. Auth problems collapse to a single quota line — there are
     /// no windows to count down.
     public static func menuBarTitleComponents(snapshot: UsageSnapshot?,
@@ -101,21 +104,30 @@ public enum QuotaDisplay {
                                               dataWarning: Bool,
                                               now: Date = Date()) -> MenuBarTitleComponents {
         if notLoggedIn {
-            return MenuBarTitleComponents(brand: "Codex ⚠️", quota: "未登录", resets: nil)
+            return MenuBarTitleComponents(brand: "Codex ⚠️", quota: "未登录", symbolName: nil, resets: nil)
         }
         if loginExpired {
-            return MenuBarTitleComponents(brand: "Codex ⚠️", quota: "过期", resets: nil)
+            return MenuBarTitleComponents(brand: "Codex ⚠️", quota: "过期", symbolName: nil, resets: nil)
         }
 
         let windows = [snapshot?.primary, snapshot?.secondary].compactMap { $0 }
         var quota = statusSlots(windows: windows) ?? "–"
         if dataWarning && snapshot != nil { quota += " ⚠️" }
 
+        let symbolName: String?
+        if snapshot == nil {
+            symbolName = nil
+        } else {
+            symbolName = (snapshot?.limitReached ?? false)
+                ? "exclamationmark.triangle.fill"
+                : "bolt.fill"
+        }
+
         let resets: String? = windows.isEmpty
             ? nil
             : "↻ " + windows.map { resetLeadText(resetAt: $0.resetAt, now: now) }
                 .joined(separator: " · ")
-        return MenuBarTitleComponents(brand: "Codex ⚡", quota: quota, resets: resets)
+        return MenuBarTitleComponents(brand: "Codex ⚡", quota: quota, symbolName: symbolName, resets: resets)
     }
 
     /// Natural-Chinese reset countdown WITHOUT the "重置" suffix — used in

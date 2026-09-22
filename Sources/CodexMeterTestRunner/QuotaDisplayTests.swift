@@ -169,16 +169,31 @@ private func testMenuBarTitleComponentsTwoLines() throws {
         snapshot: healthy, notLoggedIn: false, loginExpired: false, dataWarning: false, now: now)
     try expectEqual(components.brand, "Codex ⚡", "brand sits leftmost")
     try expectEqual(components.quota, "5小时 97% · 周度 83%", "top line: remaining quota")
+    try expectEqual(components.symbolName, "bolt.fill", "bolt trails the quota line")
     try expectEqual(
         components.resets,
         "↻ 2 小时 48 分后 · 6 天 13 小时后",
         "bottom line: reset times, dot-separated, reset symbol prefix")
+
+    // Limit reached → warning symbol replaces the bolt.
+    let limited = snapshot(
+        primary: window(used: 100, seconds: 18000,
+                        resetAt: now.addingTimeInterval(2 * 3600)),
+        secondary: window(used: 50, seconds: 604800,
+                          resetAt: now.addingTimeInterval(6 * 86400)),
+        limitReached: true)
+    try expectEqual(
+        QuotaDisplay.menuBarTitleComponents(
+            snapshot: limited, notLoggedIn: false, loginExpired: false, dataWarning: false, now: now)
+            .symbolName,
+        "exclamationmark.triangle.fill", "limit reached swaps bolt for warning")
 
     // Auth problems keep a single line.
     let loggedOut = QuotaDisplay.menuBarTitleComponents(
         snapshot: healthy, notLoggedIn: true, loginExpired: false, dataWarning: false, now: now)
     try expectEqual(loggedOut.brand, "Codex ⚠️", "auth problem brand")
     try expectEqual(loggedOut.quota, "未登录", "auth problem quota text")
+    try expectNil(loggedOut.symbolName, "no meter symbol without data")
     try expectNil(loggedOut.resets, "no reset row when logged out")
 
     // No data yet → single line.
@@ -186,12 +201,14 @@ private func testMenuBarTitleComponentsTwoLines() throws {
         snapshot: nil, notLoggedIn: false, loginExpired: false, dataWarning: false, now: now)
     try expectEqual(noData.brand, "Codex ⚡", "no data brand")
     try expectEqual(noData.quota, "–", "no data quota text")
+    try expectNil(noData.symbolName, "no meter symbol without data")
     try expectNil(noData.resets, "no reset row without windows")
 
     // Stale data keeps both rows (numbers + warning marker stay).
     let stale = QuotaDisplay.menuBarTitleComponents(
         snapshot: healthy, notLoggedIn: false, loginExpired: false, dataWarning: true, now: now)
     try expectEqual(stale.quota, "5小时 97% · 周度 83% ⚠️", "warning marker on quota line")
+    try expectEqual(stale.symbolName, "bolt.fill", "bolt stays on stale data")
     try expectNotNil(stale.resets, "reset row survives data warning")
 }
 

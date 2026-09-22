@@ -8,8 +8,9 @@ import SwiftUI
 /// This replaces the attributed-string "\n" approach, where baseline offsets
 /// moved the two rows unpredictably (TextKit line-box metrics).
 final class StatusItemContentView: NSView {
-    private let brandLabel = NSTextField(labelWithString: "Codex ⚡")
+    private let logoImageView = NSImageView()
     private let quotaLabel = NSTextField(labelWithString: "")
+    private let symbolImageView = NSImageView()
     private let resetLabel = NSTextField(labelWithString: "")
     private var verticalOffset: NSLayoutConstraint!
 
@@ -20,21 +21,28 @@ final class StatusItemContentView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
 
-        brandLabel.font = .systemFont(ofSize: 9.5)
-        brandLabel.textColor = .labelColor
+        // Codex logo leftmost (replaces the "Codex" text).
+        logoImageView.image = CodexLogo.image
+        logoImageView.imageScaling = .scaleProportionallyUpOrDown
+
         quotaLabel.font = .systemFont(ofSize: 9.5)
         quotaLabel.textColor = .labelColor
+        symbolImageView.contentTintColor = .labelColor
         resetLabel.font = .systemFont(ofSize: 8)
         resetLabel.textColor = .labelColor
 
-        // Brand leftmost (vertically centered), the two text rows stacked
-        // to its right.
-        let lines = NSStackView(views: [quotaLabel, resetLabel])
+        // Quota row: text + trailing meter symbol (bolt / warning triangle).
+        let quotaRow = NSStackView(views: [quotaLabel, symbolImageView])
+        quotaRow.orientation = .horizontal
+        quotaRow.alignment = .centerY
+        quotaRow.spacing = 3
+
+        let lines = NSStackView(views: [quotaRow, resetLabel])
         lines.orientation = .vertical
         lines.alignment = .leading
         lines.spacing = 2
 
-        let row = NSStackView(views: [brandLabel, lines])
+        let row = NSStackView(views: [logoImageView, lines])
         row.orientation = .horizontal
         row.alignment = .centerY
         row.spacing = 5
@@ -46,14 +54,24 @@ final class StatusItemContentView: NSView {
             row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
             trailingAnchor.constraint(greaterThanOrEqualTo: row.trailingAnchor, constant: 5),
             verticalOffset,
+            logoImageView.widthAnchor.constraint(equalToConstant: 13),
+            logoImageView.heightAnchor.constraint(equalToConstant: 13),
+            symbolImageView.widthAnchor.constraint(equalToConstant: 10),
+            symbolImageView.heightAnchor.constraint(equalToConstant: 10),
         ])
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    func update(brand: String, quota: String, resets: String?, offset: Double) {
-        brandLabel.stringValue = brand
+    func update(quota: String, resets: String?, symbolName: String?, offset: Double) {
         quotaLabel.stringValue = quota
+        if let symbolName {
+            symbolImageView.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(pointSize: 8, weight: .medium))
+            symbolImageView.isHidden = false
+        } else {
+            symbolImageView.isHidden = true
+        }
         if let resets {
             resetLabel.stringValue = resets
             resetLabel.isHidden = false
@@ -66,10 +84,10 @@ final class StatusItemContentView: NSView {
 
     /// Width the status item should reserve for the content plus padding.
     var preferredWidth: CGFloat {
-        var width = brandLabel.intrinsicContentSize.width + 5
-        width += max(quotaLabel.intrinsicContentSize.width,
-                     resetLabel.isHidden ? 0 : resetLabel.intrinsicContentSize.width)
-        return width + 10
+        let quotaRow = quotaLabel.intrinsicContentSize.width
+            + (symbolImageView.isHidden ? 0 : 3 + 10)
+        let resetRow = resetLabel.isHidden ? 0 : resetLabel.intrinsicContentSize.width
+        return 13 + 5 + max(quotaRow, resetRow) + 10
     }
 }
 
@@ -180,9 +198,9 @@ final class StatusItemController: NSObject {
             now: Date())
 
         contentView.update(
-            brand: components.brand,
             quota: components.quota,
             resets: components.resets,
+            symbolName: components.symbolName,
             offset: AppSettings.menuBarBaselineOffset)
         statusItem.length = contentView.preferredWidth
     }
