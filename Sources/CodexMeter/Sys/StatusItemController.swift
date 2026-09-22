@@ -20,12 +20,21 @@ final class StatusItemContentView: NSView {
     private let resetLabel = NSTextField(labelWithString: "")
     private var verticalOffset: NSLayoutConstraint!
 
+    /// true = pointer entered the item, false = left. Region-based tracking
+    /// works regardless of hitTest transparency.
+    var onHover: ((Bool) -> Void)?
+
     /// This view is transparent to clicks (hitTest nil) so the underlying
     /// NSStatusBarButton receives them and its toggle action keeps working.
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
+        addTrackingArea(NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .inVisibleRect, .activeAlways],
+            owner: self,
+            userInfo: nil))
 
         quotaLabel.font = .systemFont(ofSize: 9.5)
         quotaLabel.textColor = .labelColor
@@ -64,6 +73,14 @@ final class StatusItemContentView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func mouseEntered(with event: NSEvent) {
+        onHover?(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onHover?(false)
+    }
 
     func update(quota: String, resets: String?, symbolName: String?, offset: Double) {
         quotaLabel.stringValue = quota
@@ -108,6 +125,13 @@ final class StatusItemController: NSObject {
     private var cancellables: Set<AnyCancellable> = []
     private var globalEventMonitor: Any?
     private var localEventMonitor: Any?
+    private var globalMouseMoveMonitor: Any?
+    private var localMouseMoveMonitor: Any?
+
+    // Hover/click presentation state.
+    private var isPinned = false
+    private var hoverShowTimer: Timer?
+    private var hoverHideTimer: Timer?
 
     init(monitor: UsageMonitor) {
         self.monitor = monitor
@@ -142,6 +166,18 @@ final class StatusItemController: NSObject {
                 view.topAnchor.constraint(equalTo: button.topAnchor),
                 view.bottomAnchor.constraint(equalTo: button.bottomAnchor),
             ])
+            view.onHover = { [weak self] entered in
+                self?.handleHover(entered: entered)
+            }
+        }
+
+        // Any close path (including AppKit's transient dismissal) resets
+        // the presentation state.
+        NotificationCenter.default.addObserver(
+            forName: NSPopover.didCloseNotification,
+            object: popover,
+            queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.presentationDidClose() }
         }
 
         // objectWillChange fires before values change; hopping to the next
@@ -158,7 +194,7 @@ final class StatusItemController: NSObject {
         // the status button itself are left to the normal toggle path.
         let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown]
         globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
-            self?.dismissPopoverIfShown()
+            Task { @MainActor in self?.closePopover() }
         }
         localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
             guard let self, self.popover.isShown else { return event }
@@ -170,29 +206,121 @@ final class StatusItemController: NSObject {
         }
     }
 
-    private func dismissPopoverIfShown() {
+    // MARK: - Presentation (hover shows, click pins)
+
+    /// Hovering the item for a beat shows the panel unpinned; leaving both
+    /// the item and the panel hides it again. Clicking shows it pinned —
+    /// it then stays until the item or an outside click closes it.
+    private func handleHover(entered: Bool) {
+        if entered {
+            hoverHideTimer?.invalidate()
+            hoverHideTimer = nil
+            guard hoverShowTimer == nil else { return }
+            hoverShowTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: false) { [weak self] _ in
+                Task { @MainActor in self?.showPopover(pinned: false) }
+            }
+        } else {
+            hoverShowTimer?.invalidate()
+            hoverShowTimer = nil
+            // Moving off the item: the mouse-move tracker decides whether
+            // the pointer landed in the panel (keep) or elsewhere (hide).
+        }
+    }
+
+    private func evaluateHover() {
+        guard popover.isShown, !isPinned else { return }
+        let point = NSEvent.mouseLocation
+
+        var inItem = false
+        if let button = statusItem.button, let window = button.window {
+            inItem = window.convertToScreen(button.bounds).contains(point)
+        }
+        let inPopover = popover.contentViewController?.view.window?.frame.contains(point) ?? false
+
+        if inItem || inPopover {
+            hoverHideTimer?.invalidate()
+            hoverHideTimer = nil
+        } else if hoverHideTimer == nil {
+            hoverHideTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) { [weak self] _ in
+                Task { @MainActor in self?.closePopover() }
+            }
+        }
+    }
+
+    private func startMouseMoveTracking() {
+        globalMouseMoveMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
+            Task { @MainActor in self?.evaluateHover() }
+        }
+        localMouseMoveMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { event in
+            self.evaluateHover()
+            return event
+        }
+    }
+
+    private func stopMouseMoveTracking() {
+        globalMouseMoveMonitor.map(NSEvent.removeMonitor)
+        globalMouseMoveMonitor = nil
+        localMouseMoveMonitor.map(NSEvent.removeMonitor)
+        localMouseMoveMonitor = nil
+    }
+
+    private func showPopover(pinned: Bool) {
+        hoverShowTimer?.invalidate()
+        hoverShowTimer = nil
+        if popover.isShown {
+            if pinned { isPinned = true }
+            return
+        }
+        isPinned = pinned
+
+        // NSPopover sizes from the hosting view's fittingSize; SwiftUI
+        // height only resolves after layout, so pin an explicit size
+        // (a zero-height popover is invisible — looks like "won't open").
+        hosting.view.layoutSubtreeIfNeeded()
+        let fitted = hosting.view.fittingSize
+        popover.contentSize = NSSize(
+            width: max(330, fitted.width),
+            height: fitted.height > 1 ? fitted.height : 420)
+        monitor.refreshIfStale(maxAge: 20)
+        guard let button = statusItem.button else { return }
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        if !pinned {
+            startMouseMoveTracking()
+        }
+    }
+
+    private func closePopover() {
+        hoverShowTimer?.invalidate()
+        hoverShowTimer = nil
+        hoverHideTimer?.invalidate()
+        hoverHideTimer = nil
+        stopMouseMoveTracking()
+        isPinned = false
         if popover.isShown {
             popover.performClose(nil)
         }
     }
 
+    private func presentationDidClose() {
+        hoverShowTimer?.invalidate()
+        hoverShowTimer = nil
+        hoverHideTimer?.invalidate()
+        hoverHideTimer = nil
+        stopMouseMoveTracking()
+        isPinned = false
+    }
+
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
-        NSLog("CodexMeter: togglePopover shown=%@", "\(popover.isShown)")
         if popover.isShown {
-            popover.performClose(nil)
+            if isPinned {
+                closePopover()
+            } else {
+                // Hover-opened: the click pins it in place.
+                isPinned = true
+                stopMouseMoveTracking()
+            }
         } else {
-            // NSPopover sizes from the hosting view's fittingSize; SwiftUI
-            // height only resolves after layout, so pin an explicit size
-            // (a zero-height popover is invisible — looks like "won't open").
-            hosting.view.layoutSubtreeIfNeeded()
-            let fitted = hosting.view.fittingSize
-            popover.contentSize = NSSize(
-                width: max(330, fitted.width),
-                height: fitted.height > 1 ? fitted.height : 420)
-            NSLog("CodexMeter: showing popover contentSize=%@",
-                  "\(popover.contentSize)")
-            monitor.refreshIfStale(maxAge: 20)
-            popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+            showPopover(pinned: true)
         }
     }
 
