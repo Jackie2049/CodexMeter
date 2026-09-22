@@ -138,6 +138,60 @@ private func testMenuBarTitle() throws {
         "Codex ⚡ –", "no data yet")
 }
 
+// MARK: - two-line menu bar title (quota row + reset row)
+
+private func testResetLeadText() throws {
+    let now = Date(timeIntervalSince1970: 1_000_000)
+
+    try expectEqual(
+        QuotaDisplay.resetLeadText(resetAt: now.addingTimeInterval(2 * 3600 + 48 * 60), now: now),
+        "2 小时 48 分后", "hours + minutes, no 重置 suffix")
+    try expectEqual(
+        QuotaDisplay.resetLeadText(resetAt: now.addingTimeInterval(6 * 86400 + 13 * 3600), now: now),
+        "6 天 13 小时后", "days + hours")
+    try expectEqual(
+        QuotaDisplay.resetLeadText(resetAt: now.addingTimeInterval(42 * 60), now: now),
+        "42 分后", "minutes only")
+    try expectEqual(
+        QuotaDisplay.resetLeadText(resetAt: now.addingTimeInterval(-30), now: now),
+        "等待更新", "zero countdown waits for fresh data")
+}
+
+private func testMenuBarTitleComponentsTwoLines() throws {
+    let now = Date(timeIntervalSince1970: 1_000_000)
+    let healthy = snapshot(
+        primary: window(used: 3, seconds: 18000,
+                        resetAt: now.addingTimeInterval(2 * 3600 + 48 * 60)),
+        secondary: window(used: 17, seconds: 604800,
+                          resetAt: now.addingTimeInterval(6 * 86400 + 13 * 3600)))
+
+    let components = QuotaDisplay.menuBarTitleComponents(
+        snapshot: healthy, notLoggedIn: false, loginExpired: false, dataWarning: false, now: now)
+    try expectEqual(components.main, "Codex ⚡ 5小时 97% · 周度 83%", "top line: remaining quota")
+    try expectEqual(
+        components.resets,
+        "↻ 2 小时 48 分后 · 6 天 13 小时后",
+        "bottom line: reset times, dot-separated, reset symbol prefix")
+
+    // Auth problems keep a single line.
+    let loggedOut = QuotaDisplay.menuBarTitleComponents(
+        snapshot: healthy, notLoggedIn: true, loginExpired: false, dataWarning: false, now: now)
+    try expectEqual(loggedOut.main, "Codex ⚠️ 未登录", "auth problem top line")
+    try expectNil(loggedOut.resets, "no reset row when logged out")
+
+    // No data yet → single line.
+    let noData = QuotaDisplay.menuBarTitleComponents(
+        snapshot: nil, notLoggedIn: false, loginExpired: false, dataWarning: false, now: now)
+    try expectEqual(noData.main, "Codex ⚡ –", "no data top line")
+    try expectNil(noData.resets, "no reset row without windows")
+
+    // Stale data keeps both rows (numbers + warning marker stay).
+    let stale = QuotaDisplay.menuBarTitleComponents(
+        snapshot: healthy, notLoggedIn: false, loginExpired: false, dataWarning: true, now: now)
+    try expectEqual(stale.main, "Codex ⚡ 5小时 97% · 周度 83% ⚠️", "warning marker on top line")
+    try expectNotNil(stale.resets, "reset row survives data warning")
+}
+
 let quotaDisplayTests: [TestEntry] = [
     TestEntry(name: "UsageWindow.remainingPercent", run: sync(testRemainingPercent)),
     TestEntry(name: "QuotaThresholds.tierBoundaries", run: sync(testQuotaTierBoundaries)),
@@ -150,4 +204,6 @@ let quotaDisplayTests: [TestEntry] = [
     TestEntry(name: "QuotaDisplay.resetTextNaturalChinese", run: sync(testResetTextNaturalChinese)),
     TestEntry(name: "QuotaDisplay.resetTextZeroMeansWaiting", run: sync(testResetTextZeroMeansWaitingNotRecovered)),
     TestEntry(name: "QuotaDisplay.menuBarTitle", run: sync(testMenuBarTitle)),
+    TestEntry(name: "QuotaDisplay.resetLeadText", run: sync(testResetLeadText)),
+    TestEntry(name: "QuotaDisplay.menuBarTitleComponents", run: sync(testMenuBarTitleComponentsTwoLines)),
 ]

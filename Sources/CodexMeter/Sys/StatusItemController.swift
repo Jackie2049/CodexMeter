@@ -53,10 +53,38 @@ final class StatusItemController: NSObject {
     }
 
     private func render() {
-        statusItem.button?.title = QuotaDisplay.menuBarTitle(
+        let components = QuotaDisplay.menuBarTitleComponents(
             snapshot: monitor.snapshot,
             notLoggedIn: monitor.authState == .noAuth,
             loginExpired: monitor.authState == .loginExpired,
-            dataWarning: monitor.lastError != nil || monitor.isStale)
+            dataWarning: monitor.lastError != nil || monitor.isStale,
+            now: Date())
+
+        // Two stacked lines (iStat-style): quota row on top, reset row below.
+        // The newline glyph gets a tiny font so the rows sit tight.
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = 1
+
+        let attributed = NSMutableAttributedString(
+            string: components.main,
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 11),
+                .paragraphStyle: paragraph,
+                .foregroundColor: NSColor.labelColor,
+            ])
+
+        if let resets = components.resets {
+            attributed.append(NSAttributedString(
+                string: "\n",
+                attributes: [.font: NSFont.systemFont(ofSize: 3), .paragraphStyle: paragraph]))
+            attributed.append(NSAttributedString(
+                string: resets,
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: 9),
+                    .paragraphStyle: paragraph,
+                    .foregroundColor: NSColor.secondaryLabelColor,
+                ]))
+        }
+        statusItem.button?.attributedTitle = attributed
     }
 }

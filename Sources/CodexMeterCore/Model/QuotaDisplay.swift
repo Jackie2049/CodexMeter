@@ -46,7 +46,10 @@ public enum QuotaDisplay {
     /// missing slot shows `—`. limitReached never replaces the numbers — it
     /// is surfaced separately (icon / banner). nil = nothing to show.
     public static func statusBarText(_ snapshot: UsageSnapshot) -> String? {
-        let windows = [snapshot.primary, snapshot.secondary].compactMap { $0 }
+        statusSlots(windows: [snapshot.primary, snapshot.secondary].compactMap { $0 })
+    }
+
+    private static func statusSlots(windows: [UsageWindow]) -> String? {
         guard !windows.isEmpty else { return nil }
 
         func slot(_ seconds: Int) -> String {
@@ -72,18 +75,52 @@ public enum QuotaDisplay {
                                     notLoggedIn: Bool,
                                     loginExpired: Bool,
                                     dataWarning: Bool) -> String {
-        if notLoggedIn { return "Codex ⚠️ 未登录" }
-        if loginExpired { return "Codex ⚠️ 过期" }
-        let quota = snapshot.flatMap { statusBarText($0) } ?? "–"
-        let warning = (dataWarning && snapshot != nil) ? " ⚠️" : ""
-        return "Codex ⚡ \(quota)\(warning)"
+        menuBarTitleComponents(
+            snapshot: snapshot,
+            notLoggedIn: notLoggedIn,
+            loginExpired: loginExpired,
+            dataWarning: dataWarning).main
     }
 
-    /// Natural-Chinese reset countdown: "6 天 13 小时后重置", "3 小时后重置",
-    /// "42 分后重置" — no seconds, no "157h46m". A countdown that has reached
-    /// zero shows "等待更新": passing zero does NOT mean the quota recovered,
-    /// only a fresh snapshot can confirm that.
-    public static func resetText(resetAt: Date, now: Date) -> String {
+    public struct MenuBarTitleComponents: Equatable, Sendable {
+        /// Top line: brand + remaining quota per window.
+        public let main: String
+        /// Bottom line (nil when nothing to show): "↻ 2 小时 48 分后 · 6 天 13 小时后".
+        public let resets: String?
+    }
+
+    /// Two-row status item content: quota on top, reset countdowns below,
+    /// both rows dot-separated per window. Auth problems collapse to a
+    /// single line — there are no windows to count down.
+    public static func menuBarTitleComponents(snapshot: UsageSnapshot?,
+                                              notLoggedIn: Bool,
+                                              loginExpired: Bool,
+                                              dataWarning: Bool,
+                                              now: Date = Date()) -> MenuBarTitleComponents {
+        if notLoggedIn { return MenuBarTitleComponents(main: "Codex ⚠️ 未登录", resets: nil) }
+        if loginExpired { return MenuBarTitleComponents(main: "Codex ⚠️ 过期", resets: nil) }
+
+        let windows = [snapshot?.primary, snapshot?.secondary].compactMap { $0 }
+        var main: String
+        if let snapshot {
+            let slots = statusSlots(windows: windows)
+            main = "Codex ⚡ \(slots ?? "–")"
+            if dataWarning { main += " ⚠️" }
+        } else {
+            main = "Codex ⚡ –"
+        }
+
+        let resets: String? = windows.isEmpty
+            ? nil
+            : "↻ " + windows.map { resetLeadText(resetAt: $0.resetAt, now: now) }
+                .joined(separator: " · ")
+        return MenuBarTitleComponents(main: main, resets: resets)
+    }
+
+    /// Natural-Chinese reset countdown WITHOUT the "重置" suffix — used in
+    /// the status item's second row where the ↻ prefix carries the meaning.
+    /// "2 小时 48 分后" / "6 天 13 小时后" / "等待更新"; no seconds.
+    public static func resetLeadText(resetAt: Date, now: Date) -> String {
         let remaining = resetAt.timeIntervalSince(now)
         if remaining <= 0 { return "等待更新" }
 
@@ -93,11 +130,20 @@ public enum QuotaDisplay {
         let minutes = (total % 3600) / 60
 
         if days >= 1 {
-            return hours > 0 ? "\(days) 天 \(hours) 小时后重置" : "\(days) 天后重置"
+            return hours > 0 ? "\(days) 天 \(hours) 小时后" : "\(days) 天后"
         }
         if hours >= 1 {
-            return minutes > 0 ? "\(hours) 小时 \(minutes) 分后重置" : "\(hours) 小时后重置"
+            return minutes > 0 ? "\(hours) 小时 \(minutes) 分后" : "\(hours) 小时后"
         }
-        return "\(max(1, minutes)) 分后重置"
+        return "\(max(1, minutes)) 分后"
+    }
+
+    /// Natural-Chinese reset countdown: "6 天 13 小时后重置", "3 小时后重置",
+    /// "42 分后重置" — no seconds, no "157h46m". A countdown that has reached
+    /// zero shows "等待更新": passing zero does NOT mean the quota recovered,
+    /// only a fresh snapshot can confirm that.
+    public static func resetText(resetAt: Date, now: Date) -> String {
+        let lead = resetLeadText(resetAt: resetAt, now: now)
+        return lead == "等待更新" ? lead : lead + "重置"
     }
 }
