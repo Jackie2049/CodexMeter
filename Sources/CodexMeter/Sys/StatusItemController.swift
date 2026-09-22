@@ -15,6 +15,8 @@ final class StatusItemController: NSObject {
     private let statusItem: NSStatusItem
     private let popover: NSPopover
     private var cancellables: Set<AnyCancellable> = []
+    private var globalEventMonitor: Any?
+    private var localEventMonitor: Any?
 
     init(monitor: UsageMonitor) {
         self.monitor = monitor
@@ -41,6 +43,29 @@ final class StatusItemController: NSObject {
             .sink { [weak self] _ in self?.render() }
             .store(in: &cancellables)
         render()
+
+        // Auto-dismiss: .transient alone misses outside clicks in some
+        // window configurations (desktop, other apps' status items), so
+        // watch both event streams explicitly. Clicks on the popover or
+        // the status button itself are left to the normal toggle path.
+        let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown]
+        globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
+            self?.dismissPopoverIfShown()
+        }
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
+            guard let self, self.popover.isShown else { return event }
+            let popoverWindow = self.popover.contentViewController?.view.window
+            if event.window !== popoverWindow, event.window !== self.statusItem.button?.window {
+                self.popover.performClose(nil)
+            }
+            return event
+        }
+    }
+
+    private func dismissPopoverIfShown() {
+        if popover.isShown {
+            popover.performClose(nil)
+        }
     }
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
