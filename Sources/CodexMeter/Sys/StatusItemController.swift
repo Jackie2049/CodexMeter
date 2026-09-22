@@ -56,8 +56,8 @@ final class StatusItemContentView: NSView {
             row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
             trailingAnchor.constraint(greaterThanOrEqualTo: row.trailingAnchor, constant: 5),
             verticalOffset,
-            logoView.widthAnchor.constraint(equalToConstant: 19.5),
-            logoView.heightAnchor.constraint(equalToConstant: 19.5),
+            logoView.widthAnchor.constraint(equalToConstant: 23.4),
+            logoView.heightAnchor.constraint(equalToConstant: 23.4),
             symbolImageView.widthAnchor.constraint(equalToConstant: 10),
             symbolImageView.heightAnchor.constraint(equalToConstant: 10),
         ])
@@ -89,7 +89,7 @@ final class StatusItemContentView: NSView {
         let quotaRow = quotaLabel.intrinsicContentSize.width
             + (symbolImageView.isHidden ? 0 : 3 + 10)
         let resetRow = resetLabel.isHidden ? 0 : resetLabel.intrinsicContentSize.width
-        return 19.5 + 5 + max(quotaRow, resetRow) + 10
+        return 23.4 + 5 + max(quotaRow, resetRow) + 10
     }
 }
 
