@@ -140,6 +140,9 @@ public enum L10n {
         public static var resetReminder: String { str("重置提醒", "Recovery reminder", "重置提醒") }
         public static var launchAtLogin: String { str("开机自启", "Launch at login", "開機自動啟動") }
         public static var language: String { str("语言", "Language", "語言") }
+        public static func version(_ v: String?) -> String {
+            str("版本 v\(v ?? "–")", "Version v\(v ?? "–")", "版本 v\(v ?? "–")")
+        }
         public static var quit: String { str("退出 CodexMeter", "Quit CodexMeter", "結束 CodexMeter") }
     }
 

@@ -101,6 +101,8 @@ struct MenuPanelView: View {
                     set: { _ = LoginItem.setEnabled($0) }))
             }
             Divider()
+            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+            Text(L10n.Menu.version(version))
             Button(L10n.Menu.quit) { NSApp.terminate(nil) }
         } label: {
             Image(systemName: "gearshape")
