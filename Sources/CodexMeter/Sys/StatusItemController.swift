@@ -8,7 +8,7 @@ import SwiftUI
 /// This replaces the attributed-string "\n" approach, where baseline offsets
 /// moved the two rows unpredictably (TextKit line-box metrics).
 final class StatusItemContentView: NSView {
-    private let logoImageView = NSImageView()
+    private let logoView = CodexGlyphView()
     private let quotaLabel = NSTextField(labelWithString: "")
     private let symbolImageView = NSImageView()
     private let resetLabel = NSTextField(labelWithString: "")
@@ -20,10 +20,6 @@ final class StatusItemContentView: NSView {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-
-        // Codex logo leftmost (replaces the "Codex" text).
-        logoImageView.image = CodexLogo.image
-        logoImageView.imageScaling = .scaleProportionallyUpOrDown
 
         quotaLabel.font = .systemFont(ofSize: 9.5)
         quotaLabel.textColor = .labelColor
@@ -42,7 +38,7 @@ final class StatusItemContentView: NSView {
         lines.alignment = .leading
         lines.spacing = 2
 
-        let row = NSStackView(views: [logoImageView, lines])
+        let row = NSStackView(views: [logoView, lines])
         row.orientation = .horizontal
         row.alignment = .centerY
         row.spacing = 5
@@ -54,8 +50,8 @@ final class StatusItemContentView: NSView {
             row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
             trailingAnchor.constraint(greaterThanOrEqualTo: row.trailingAnchor, constant: 5),
             verticalOffset,
-            logoImageView.widthAnchor.constraint(equalToConstant: 13),
-            logoImageView.heightAnchor.constraint(equalToConstant: 13),
+            logoView.widthAnchor.constraint(equalToConstant: 13),
+            logoView.heightAnchor.constraint(equalToConstant: 13),
             symbolImageView.widthAnchor.constraint(equalToConstant: 10),
             symbolImageView.heightAnchor.constraint(equalToConstant: 10),
         ])
