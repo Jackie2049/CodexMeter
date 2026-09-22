@@ -8,6 +8,7 @@ import SwiftUI
 /// This replaces the attributed-string "\n" approach, where baseline offsets
 /// moved the two rows unpredictably (TextKit line-box metrics).
 final class StatusItemContentView: NSView {
+    private let brandLabel = NSTextField(labelWithString: "Codex ⚡")
     private let quotaLabel = NSTextField(labelWithString: "")
     private let resetLabel = NSTextField(labelWithString: "")
     private var verticalOffset: NSLayoutConstraint!
@@ -19,29 +20,39 @@ final class StatusItemContentView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
 
+        brandLabel.font = .systemFont(ofSize: 9.5)
+        brandLabel.textColor = .labelColor
         quotaLabel.font = .systemFont(ofSize: 9.5)
         quotaLabel.textColor = .labelColor
         resetLabel.font = .systemFont(ofSize: 8)
         resetLabel.textColor = .labelColor
 
-        let stack = NSStackView(views: [quotaLabel, resetLabel])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 2
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
+        // Brand leftmost (vertically centered), the two text rows stacked
+        // to its right.
+        let lines = NSStackView(views: [quotaLabel, resetLabel])
+        lines.orientation = .vertical
+        lines.alignment = .leading
+        lines.spacing = 2
 
-        verticalOffset = stack.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 0)
+        let row = NSStackView(views: [brandLabel, lines])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 5
+        row.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(row)
+
+        verticalOffset = row.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 0)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
-            trailingAnchor.constraint(greaterThanOrEqualTo: stack.trailingAnchor, constant: 5),
+            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
+            trailingAnchor.constraint(greaterThanOrEqualTo: row.trailingAnchor, constant: 5),
             verticalOffset,
         ])
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    func update(quota: String, resets: String?, offset: Double) {
+    func update(brand: String, quota: String, resets: String?, offset: Double) {
+        brandLabel.stringValue = brand
         quotaLabel.stringValue = quota
         if let resets {
             resetLabel.stringValue = resets
@@ -55,10 +66,9 @@ final class StatusItemContentView: NSView {
 
     /// Width the status item should reserve for the content plus padding.
     var preferredWidth: CGFloat {
-        var width = quotaLabel.intrinsicContentSize.width
-        if !resetLabel.isHidden {
-            width = max(width, resetLabel.intrinsicContentSize.width)
-        }
+        var width = brandLabel.intrinsicContentSize.width + 5
+        width += max(quotaLabel.intrinsicContentSize.width,
+                     resetLabel.isHidden ? 0 : resetLabel.intrinsicContentSize.width)
         return width + 10
     }
 }
@@ -73,6 +83,7 @@ final class StatusItemController: NSObject {
     private let monitor: UsageMonitor
     private let statusItem: NSStatusItem
     private let popover: NSPopover
+    private let hosting: NSHostingController<MenuPanelView>
     private var contentView: StatusItemContentView!
     private var cancellables: Set<AnyCancellable> = []
     private var globalEventMonitor: Any?
@@ -85,7 +96,7 @@ final class StatusItemController: NSObject {
         popover = NSPopover()
         popover.behavior = .transient
         popover.animates = true
-        let hosting = NSHostingController(rootView: MenuPanelView(monitor: monitor))
+        hosting = NSHostingController(rootView: MenuPanelView(monitor: monitor))
         hosting.sizingOptions = [.preferredContentSize]
         popover.contentViewController = hosting
 
@@ -141,9 +152,20 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
+        NSLog("CodexMeter: togglePopover shown=%@", "\(popover.isShown)")
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            // NSPopover sizes from the hosting view's fittingSize; SwiftUI
+            // height only resolves after layout, so pin an explicit size
+            // (a zero-height popover is invisible — looks like "won't open").
+            hosting.view.layoutSubtreeIfNeeded()
+            let fitted = hosting.view.fittingSize
+            popover.contentSize = NSSize(
+                width: max(330, fitted.width),
+                height: fitted.height > 1 ? fitted.height : 420)
+            NSLog("CodexMeter: showing popover contentSize=%@",
+                  "\(popover.contentSize)")
             monitor.refreshIfStale(maxAge: 20)
             popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
         }
@@ -158,7 +180,8 @@ final class StatusItemController: NSObject {
             now: Date())
 
         contentView.update(
-            quota: components.main,
+            brand: components.brand,
+            quota: components.quota,
             resets: components.resets,
             offset: AppSettings.menuBarBaselineOffset)
         statusItem.length = contentView.preferredWidth

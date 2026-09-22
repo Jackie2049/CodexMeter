@@ -167,7 +167,8 @@ private func testMenuBarTitleComponentsTwoLines() throws {
 
     let components = QuotaDisplay.menuBarTitleComponents(
         snapshot: healthy, notLoggedIn: false, loginExpired: false, dataWarning: false, now: now)
-    try expectEqual(components.main, "Codex ⚡ 5小时 97% · 周度 83%", "top line: remaining quota")
+    try expectEqual(components.brand, "Codex ⚡", "brand sits leftmost")
+    try expectEqual(components.quota, "5小时 97% · 周度 83%", "top line: remaining quota")
     try expectEqual(
         components.resets,
         "↻ 2 小时 48 分后 · 6 天 13 小时后",
@@ -176,19 +177,21 @@ private func testMenuBarTitleComponentsTwoLines() throws {
     // Auth problems keep a single line.
     let loggedOut = QuotaDisplay.menuBarTitleComponents(
         snapshot: healthy, notLoggedIn: true, loginExpired: false, dataWarning: false, now: now)
-    try expectEqual(loggedOut.main, "Codex ⚠️ 未登录", "auth problem top line")
+    try expectEqual(loggedOut.brand, "Codex ⚠️", "auth problem brand")
+    try expectEqual(loggedOut.quota, "未登录", "auth problem quota text")
     try expectNil(loggedOut.resets, "no reset row when logged out")
 
     // No data yet → single line.
     let noData = QuotaDisplay.menuBarTitleComponents(
         snapshot: nil, notLoggedIn: false, loginExpired: false, dataWarning: false, now: now)
-    try expectEqual(noData.main, "Codex ⚡ –", "no data top line")
+    try expectEqual(noData.brand, "Codex ⚡", "no data brand")
+    try expectEqual(noData.quota, "–", "no data quota text")
     try expectNil(noData.resets, "no reset row without windows")
 
     // Stale data keeps both rows (numbers + warning marker stay).
     let stale = QuotaDisplay.menuBarTitleComponents(
         snapshot: healthy, notLoggedIn: false, loginExpired: false, dataWarning: true, now: now)
-    try expectEqual(stale.main, "Codex ⚡ 5小时 97% · 周度 83% ⚠️", "warning marker on top line")
+    try expectEqual(stale.quota, "5小时 97% · 周度 83% ⚠️", "warning marker on quota line")
     try expectNotNil(stale.resets, "reset row survives data warning")
 }
 

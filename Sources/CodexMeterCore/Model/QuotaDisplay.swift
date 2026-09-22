@@ -75,46 +75,47 @@ public enum QuotaDisplay {
                                     notLoggedIn: Bool,
                                     loginExpired: Bool,
                                     dataWarning: Bool) -> String {
-        menuBarTitleComponents(
+        let components = menuBarTitleComponents(
             snapshot: snapshot,
             notLoggedIn: notLoggedIn,
             loginExpired: loginExpired,
-            dataWarning: dataWarning).main
+            dataWarning: dataWarning)
+        return "\(components.brand) \(components.quota)"
     }
 
     public struct MenuBarTitleComponents: Equatable, Sendable {
-        /// Top line: brand + remaining quota per window.
-        public let main: String
+        /// Leftmost element: "Codex ⚡" (or "Codex ⚠️" on auth problems).
+        public let brand: String
+        /// Quota text: "5小时 97% · 周度 83%" / "未登录" / "–".
+        public let quota: String
         /// Bottom line (nil when nothing to show): "↻ 2 小时 48 分后 · 6 天 13 小时后".
         public let resets: String?
     }
 
-    /// Two-row status item content: quota on top, reset countdowns below,
-    /// both rows dot-separated per window. Auth problems collapse to a
-    /// single line — there are no windows to count down.
+    /// Status item content: brand leftmost, quota + reset rows stacked to
+    /// its right. Auth problems collapse to a single quota line — there are
+    /// no windows to count down.
     public static func menuBarTitleComponents(snapshot: UsageSnapshot?,
                                               notLoggedIn: Bool,
                                               loginExpired: Bool,
                                               dataWarning: Bool,
                                               now: Date = Date()) -> MenuBarTitleComponents {
-        if notLoggedIn { return MenuBarTitleComponents(main: "Codex ⚠️ 未登录", resets: nil) }
-        if loginExpired { return MenuBarTitleComponents(main: "Codex ⚠️ 过期", resets: nil) }
+        if notLoggedIn {
+            return MenuBarTitleComponents(brand: "Codex ⚠️", quota: "未登录", resets: nil)
+        }
+        if loginExpired {
+            return MenuBarTitleComponents(brand: "Codex ⚠️", quota: "过期", resets: nil)
+        }
 
         let windows = [snapshot?.primary, snapshot?.secondary].compactMap { $0 }
-        var main: String
-        if let snapshot {
-            let slots = statusSlots(windows: windows)
-            main = "Codex ⚡ \(slots ?? "–")"
-            if dataWarning { main += " ⚠️" }
-        } else {
-            main = "Codex ⚡ –"
-        }
+        var quota = statusSlots(windows: windows) ?? "–"
+        if dataWarning && snapshot != nil { quota += " ⚠️" }
 
         let resets: String? = windows.isEmpty
             ? nil
             : "↻ " + windows.map { resetLeadText(resetAt: $0.resetAt, now: now) }
                 .joined(separator: " · ")
-        return MenuBarTitleComponents(main: main, resets: resets)
+        return MenuBarTitleComponents(brand: "Codex ⚡", quota: quota, resets: resets)
     }
 
     /// Natural-Chinese reset countdown WITHOUT the "重置" suffix — used in
