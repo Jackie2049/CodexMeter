@@ -30,7 +30,7 @@ final class StatusItemContentView: NSView {
         quotaLabel.font = .systemFont(ofSize: 9.5)
         quotaLabel.textColor = .labelColor
         symbolImageView.contentTintColor = .labelColor
-        resetLabel.font = .systemFont(ofSize: 8)
+        resetLabel.font = .systemFont(ofSize: 9.5)
         resetLabel.textColor = .labelColor
 
         // Quota row: leading meter symbol (bolt / warning triangle) + text.
