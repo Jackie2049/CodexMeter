@@ -8,7 +8,13 @@ import SwiftUI
 /// This replaces the attributed-string "\n" approach, where baseline offsets
 /// moved the two rows unpredictably (TextKit line-box metrics).
 final class StatusItemContentView: NSView {
-    private let logoView = CodexGlyphView()
+    private let logoView: NSImageView = {
+        let view = NSImageView()
+        view.image = CodexMark.templateImage
+        view.imageScaling = .scaleProportionallyUpOrDown
+        view.contentTintColor = .labelColor
+        return view
+    }()
     private let quotaLabel = NSTextField(labelWithString: "")
     private let symbolImageView = NSImageView()
     private let resetLabel = NSTextField(labelWithString: "")
