@@ -22,7 +22,6 @@ final class StatusItemContentView: NSView {
         let bolt: NSImageView
         let label: NSTextField
         let quota: NSTextField
-        let dot: NSTextField
         let refresh: NSImageView
         let reset: NSTextField
     }
@@ -83,10 +82,6 @@ final class StatusItemContentView: NSView {
         quota.font = .systemFont(ofSize: 9.5)
         quota.textColor = .labelColor
 
-        let dot = NSTextField(labelWithString: "·")
-        dot.font = .systemFont(ofSize: 9.5)
-        dot.textColor = .labelColor
-
         let refresh = NSImageView()
         refresh.contentTintColor = .labelColor
         refresh.image = NSImage(systemSymbolName: "arrow.counterclockwise",
@@ -97,12 +92,12 @@ final class StatusItemContentView: NSView {
         reset.font = .systemFont(ofSize: 9.5)
         reset.textColor = .labelColor
 
-        let stack = NSStackView(views: [bolt, label, quota, dot, refresh, reset])
+        let stack = NSStackView(views: [bolt, label, quota, refresh, reset])
         stack.orientation = .horizontal
         stack.alignment = .centerY
         stack.spacing = 3
         return WindowRow(stack: stack, bolt: bolt, label: label,
-                         quota: quota, dot: dot, refresh: refresh, reset: reset)
+                         quota: quota, refresh: refresh, reset: reset)
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -123,6 +118,9 @@ final class StatusItemContentView: NSView {
         }
 
         for (index, row) in windowRows.enumerated() {
+            // The container itself was hidden at init for single-window
+            // plans — restore it whenever this row has content.
+            row.stack.isHidden = index >= rows.count
             if index < rows.count {
                 let line = rows[index]
                 row.bolt.image = symbolImage
@@ -131,7 +129,6 @@ final class StatusItemContentView: NSView {
                 row.label.isHidden = false
                 row.quota.stringValue = line.quota
                 row.quota.isHidden = false
-                row.dot.isHidden = false
                 row.refresh.isHidden = false
                 row.reset.stringValue = line.reset
                 row.reset.isHidden = false
@@ -139,7 +136,6 @@ final class StatusItemContentView: NSView {
                 row.bolt.isHidden = true
                 row.label.isHidden = true
                 row.quota.isHidden = true
-                row.dot.isHidden = true
                 row.refresh.isHidden = true
                 row.reset.isHidden = true
             }
