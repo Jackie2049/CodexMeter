@@ -27,7 +27,7 @@ final class StatusItemContentView: NSView {
         let stack = NSStackView(views: [quotaLabel, resetLabel])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 0
+        stack.spacing = 2
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
 
