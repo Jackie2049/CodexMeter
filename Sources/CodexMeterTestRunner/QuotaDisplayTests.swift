@@ -171,15 +171,29 @@ private func testMenuBarTitleComponentsTwoLines() throws {
     try expectEqual(components.symbolName, "bolt.fill", "bolt leads each quota")
 
     // One row per window: 5小时 on top, 周度 below; quota then reset.
+    // Short-window resets show a clock time; long windows keep a countdown.
     try expectEqual(components.lines.count, 2, "two windows, two rows")
     let first = try expectNotNil(components.lines.first, "first row")
     try expectEqual(first.label, "5小时", "row 1 label")
     try expectEqual(first.quota, "97%", "row 1 quota")
-    try expectEqual(first.reset, "2 小时 48 分后", "row 1 reset")
+    try expectTrue(
+        first.reset.range(of: #"^\d{1,2}:\d{2}$"#, options: .regularExpression) != nil,
+        "5小时 row shows a clock time, got \(first.reset)")
     let second = try expectNotNil(components.lines.dropFirst().first, "second row")
     try expectEqual(second.label, "周度", "row 2 label")
     try expectEqual(second.quota, "83%", "row 2 quota")
-    try expectEqual(second.reset, "6 天 13 小时后", "row 2 reset")
+    try expectEqual(second.reset, "6 天 13 小时后", "row 2 keeps the countdown")
+
+    // A reset time that already passed waits for fresh data — no stale clock.
+    let passed = snapshot(
+        primary: window(used: 3, seconds: 18000, resetAt: now.addingTimeInterval(-60)),
+        secondary: window(used: 17, seconds: 604800,
+                          resetAt: now.addingTimeInterval(6 * 86400 + 13 * 3600)))
+    try expectEqual(
+        QuotaDisplay.menuBarTitleComponents(
+            snapshot: passed, notLoggedIn: false, loginExpired: false, dataWarning: false, now: now)
+            .lines.first?.reset,
+        "等待更新", "passed countdown waits, no stale clock")
 
     // Legacy combined strings still serve the single-line menuBarTitle.
     try expectEqual(components.quota, "5小时 97% · 周度 83%", "legacy combined quota")

@@ -27,6 +27,15 @@ public enum QuotaThresholds {
 public enum QuotaDisplay {
     static let fiveHoursSeconds = 18000
     static let weekSeconds = 604800
+    /// Windows this short show a clock time instead of a countdown.
+    static let statusClockWindowSeconds = 6 * 3600
+
+    private static let clockFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
 
     /// Canonical window names, used everywhere (status bar, panel, alerts):
     /// 18000 → "5小时", 604800 → "周度".
@@ -130,10 +139,22 @@ public enum QuotaDisplay {
         let lines = windows.map { window -> MenuBarWindowLine in
             var lineQuota = "\(window.remainingPercent)%"
             if dataWarning { lineQuota += " ⚠️" }
+            // Short windows (≤6h): a clock time beats a countdown. Longer
+            // windows keep the natural-Chinese lead; a passed reset waits
+            // for fresh data instead of showing a stale clock.
+            let remaining = window.resetAt.timeIntervalSince(now)
+            let reset: String
+            if remaining <= 0 {
+                reset = "等待更新"
+            } else if window.windowSeconds <= statusClockWindowSeconds {
+                reset = clockFormatter.string(from: window.resetAt)
+            } else {
+                reset = resetLeadText(resetAt: window.resetAt, now: now)
+            }
             return MenuBarWindowLine(
                 label: longLabel(seconds: window.windowSeconds),
                 quota: lineQuota,
-                reset: resetLeadText(resetAt: window.resetAt, now: now))
+                reset: reset)
         }
 
         let symbolName: String?
