@@ -26,11 +26,11 @@ enum AppSettings {
 
     // MARK: - Menu bar layout
 
-    /// Vertical baseline offset (pt) for the two-line status item. NSStatusBar
-    /// centers single-line metrics, so multi-line blocks ride high; fixed at
-    /// -9.5pt by default, overridable via
-    /// `defaults write com.jackie.CodexMeter menuBarBaselineOffset -float <pt>`.
-    static let menuBarBaselineOffsetDefault = -9.5
+    /// Vertical offset (pt) of the status item's two-line block relative to
+    /// the button's vertical center (positive = down). The block is centered
+    /// by an explicit constraint, so 0 is the balanced position; overridable
+    /// via `defaults write com.jackie.CodexMeter menuBarBaselineOffset -float <pt>`.
+    static let menuBarBaselineOffsetDefault = 0.0
 
     static var menuBarBaselineOffset: Double {
         UserDefaults.standard.object(forKey: "menuBarBaselineOffset") as? Double

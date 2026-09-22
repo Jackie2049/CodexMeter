@@ -3,17 +3,77 @@ import Combine
 import CodexMeterCore
 import SwiftUI
 
+/// Content view for the status item button: two stacked labels (quota row on
+/// top, reset row below) whose vertical position is an explicit constraint.
+/// This replaces the attributed-string "\n" approach, where baseline offsets
+/// moved the two rows unpredictably (TextKit line-box metrics).
+final class StatusItemContentView: NSView {
+    private let quotaLabel = NSTextField(labelWithString: "")
+    private let resetLabel = NSTextField(labelWithString: "")
+    private var verticalOffset: NSLayoutConstraint!
+
+    /// This view is transparent to clicks (hitTest nil) so the underlying
+    /// NSStatusBarButton receives them and its toggle action keeps working.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+
+        quotaLabel.font = .systemFont(ofSize: 9.5)
+        quotaLabel.textColor = .labelColor
+        resetLabel.font = .systemFont(ofSize: 8)
+        resetLabel.textColor = .labelColor
+
+        let stack = NSStackView(views: [quotaLabel, resetLabel])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 0
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+
+        verticalOffset = stack.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 0)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
+            trailingAnchor.constraint(greaterThanOrEqualTo: stack.trailingAnchor, constant: 5),
+            verticalOffset,
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    func update(quota: String, resets: String?, offset: Double) {
+        quotaLabel.stringValue = quota
+        if let resets {
+            resetLabel.stringValue = resets
+            resetLabel.isHidden = false
+        } else {
+            resetLabel.stringValue = ""
+            resetLabel.isHidden = true
+        }
+        verticalOffset.constant = offset
+    }
+
+    /// Width the status item should reserve for the content plus padding.
+    var preferredWidth: CGFloat {
+        var width = quotaLabel.intrinsicContentSize.width
+        if !resetLabel.isHidden {
+            width = max(width, resetLabel.intrinsicContentSize.width)
+        }
+        return width + 10
+    }
+}
+
 /// Owns the NSStatusItem (menu bar) and the NSPopover (panel).
 ///
 /// Replaces SwiftUI's MenuBarExtra: its label view does not reliably
 /// re-render on observed-object changes, which froze the menu bar title
-/// at whatever state it had at launch ("未登录" forever). NSStatusItem
-/// gives a plain `button.title` we can set on every change.
+/// at whatever state it had at launch ("未登录" forever).
 @MainActor
 final class StatusItemController: NSObject {
     private let monitor: UsageMonitor
     private let statusItem: NSStatusItem
     private let popover: NSPopover
+    private var contentView: StatusItemContentView!
     private var cancellables: Set<AnyCancellable> = []
     private var globalEventMonitor: Any?
     private var localEventMonitor: Any?
@@ -32,8 +92,20 @@ final class StatusItemController: NSObject {
         super.init()
 
         if let button = statusItem.button {
+            button.title = "" // content drawn by StatusItemContentView
             button.target = self
             button.action = #selector(togglePopover(_:))
+
+            let view = StatusItemContentView()
+            contentView = view
+            view.translatesAutoresizingMaskIntoConstraints = false
+            button.addSubview(view)
+            NSLayoutConstraint.activate([
+                view.leadingAnchor.constraint(equalTo: button.leadingAnchor),
+                view.trailingAnchor.constraint(equalTo: button.trailingAnchor),
+                view.topAnchor.constraint(equalTo: button.topAnchor),
+                view.bottomAnchor.constraint(equalTo: button.bottomAnchor),
+            ])
         }
 
         // objectWillChange fires before values change; hopping to the next
@@ -85,41 +157,10 @@ final class StatusItemController: NSObject {
             dataWarning: monitor.lastError != nil || monitor.isStale,
             now: Date())
 
-        // Two stacked lines (iStat-style): quota row on top, reset row below.
-        // Sizes are budgeted so both rows fit the ~24pt menu bar. NSStatusBar
-        // centers single-line metrics, so multi-line blocks ride high — a
-        // negative baselineOffset nudges the whole block down. Both rows use
-        // labelColor: secondaryLabelColor resolves near-invisible on the dark
-        // menu bar.
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 0.5
-
-        let attributed = NSMutableAttributedString(
-            string: components.main,
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 9.5),
-                .paragraphStyle: paragraph,
-                .foregroundColor: NSColor.labelColor,
-                .baselineOffset: AppSettings.menuBarBaselineOffset,
-            ])
-
-        if let resets = components.resets {
-            attributed.append(NSAttributedString(
-                string: "\n",
-                attributes: [
-                    .font: NSFont.systemFont(ofSize: 8),
-                    .paragraphStyle: paragraph,
-                    .baselineOffset: AppSettings.menuBarBaselineOffset,
-                ]))
-            attributed.append(NSAttributedString(
-                string: resets,
-                attributes: [
-                    .font: NSFont.systemFont(ofSize: 8),
-                    .paragraphStyle: paragraph,
-                    .foregroundColor: NSColor.labelColor,
-                    .baselineOffset: AppSettings.menuBarBaselineOffset,
-                ]))
-        }
-        statusItem.button?.attributedTitle = attributed
+        contentView.update(
+            quota: components.main,
+            resets: components.resets,
+            offset: AppSettings.menuBarBaselineOffset)
+        statusItem.length = contentView.preferredWidth
     }
 }
