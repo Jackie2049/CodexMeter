@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history + tags: make_app.sh reads the version from git describe
+      - name: Build
+        run: swift build -c release
+      - name: Test
+        run: swift run CodexMeterTestRunner
+      - name: Package app
+        run: bash Scripts/make_app.sh build
+      - name: Zip
+        run: |
+          cd build
+          zip -qry "CodexMeter-${GITHUB_REF_NAME}.zip" "CodexMeter.app"
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "build/CodexMeter-${GITHUB_REF_NAME}.zip" \
+            --title "CodexMeter $GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes "## Install
+          1. Download \`CodexMeter-${GITHUB_REF_NAME}.zip\` and unzip.
+          2. Move \`CodexMeter.app\` to /Applications.
+          3. Run \`xattr -cr /Applications/CodexMeter.app\` — the build is unsigned, so Gatekeeper will block it otherwise.
+          4. Launch. Requires macOS 14+.
+
+          ## Known issues
+          - Not notarized (no Apple Developer ID); unsigned ad-hoc build.
+          - Reads \`~/.codex/auth.json\` — log in with \`codex login\` first."
