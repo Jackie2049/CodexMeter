@@ -60,6 +60,13 @@ final class StatusItemController: NSObject {
             }
             return event
         }
+
+        NotificationCenter.default.addObserver(
+            forName: AppSettings.menuBarOffsetChanged,
+            object: nil,
+            queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.render() }
+        }
     }
 
     private func dismissPopoverIfShown() {
@@ -100,7 +107,7 @@ final class StatusItemController: NSObject {
                 .font: NSFont.systemFont(ofSize: 9.5),
                 .paragraphStyle: paragraph,
                 .foregroundColor: NSColor.labelColor,
-                .baselineOffset: -4.5,
+                .baselineOffset: AppSettings.menuBarBaselineOffset,
             ])
 
         if let resets = components.resets {
@@ -109,7 +116,7 @@ final class StatusItemController: NSObject {
                 attributes: [
                     .font: NSFont.systemFont(ofSize: 8),
                     .paragraphStyle: paragraph,
-                    .baselineOffset: -4.5,
+                    .baselineOffset: AppSettings.menuBarBaselineOffset,
                 ]))
             attributed.append(NSAttributedString(
                 string: resets,
@@ -117,7 +124,7 @@ final class StatusItemController: NSObject {
                     .font: NSFont.systemFont(ofSize: 8),
                     .paragraphStyle: paragraph,
                     .foregroundColor: NSColor.labelColor,
-                    .baselineOffset: -4.5,
+                    .baselineOffset: AppSettings.menuBarBaselineOffset,
                 ]))
         }
         statusItem.button?.attributedTitle = attributed
