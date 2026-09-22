@@ -112,13 +112,17 @@ bash Scripts/make_app.sh
 
 ## 7. 长期项目文档
 
-保持最小且有明确职责的文档集合：
+保持最小且有明确职责的文档集合（现状均已落地）：
 
-- `README.md`：定位、真实截图或动图、已实现功能、安装、系统要求、数据访问说明、构建测试、架构入口、非官方声明和致谢。中文优先。
-- `docs/architecture.md`：数据流、模块职责、关键约定、重要取舍和已知限制；不逐个解释类或复制代码。
-- `ROADMAP.md`：只保留“正在打磨 / 待考虑 / 暂不做”，每项一两句话，不承诺日期。没有新目标时允许“正在打磨”为空。
+- `README.md`：中文主页。定位、真实截图或动图、已实现功能、安装、系统要求、数据访问说明、构建测试、架构入口、非官方声明和致谢。
+- `README.en.md`：英文主页，内容与中文版对齐；顶部与 `README.md` 互相跳转。用户界面语言另有 简体中文 / English / 繁體中文 三语切换（见下）。
+- `docs/architecture.md`：数据流、模块职责、关键约定、重要取舍和已知限制；不逐个解释类或复制代码。代码结构变动时同步更新。
 - `AGENTS.md`：长期协作规范，不作为每轮进度日志。
-- `LICENSE`：用户选定并核对第三方兼容性的许可证。
+- `LICENSE`：MIT，版权人 Jackie2049。
+
+~~ROADMAP.md~~：维护者裁定不使用（小项目，特性方向直接在对话中讨论并进入验证与交付流程）。
+
+用户界面语言策略：所有用户可见文案（菜单栏、面板、通知、错误描述）必须通过 `CodexMeterCore` 的 `L10n`（三列式 `str(简, en, 繁)`）输出，禁止硬编码单一语言字符串；新增文案时三个语言同步补齐。
 
 必要时为重要架构选择增加短决策记录，但不默认引入完整 ADR 体系。完成的功能进 README，版本变化进 GitHub Release，不维护重复台账或默认增加 CHANGELOG。
 
@@ -137,6 +141,14 @@ bash Scripts/make_app.sh
 - 保留历史 Release 供回退；修复已发布问题应发布新版本，不悄悄替换同版本产物。
 
 创建仓库、设置可见性、推送、推送 tag 和公开 Release 均依据用户明确授权。普通开发授权不等于发布授权；用户已经明确授权的范围无需重复确认。
+
+### 已落地的版本来源与发版 Runbook
+
+- 版本单一来源已实现：`Scripts/make_app.sh` 用 `git describe --tags --abbrev=0 --match 'v*'` 把最近 `v` tag 注入 `CFBundleShortVersionString`（无 tag 时回退 `0.1.0-dev`），`CFBundleVersion` 为提交计数；面板齿轮菜单显示应用内版本（读 Bundle）。
+- 发版入口：`Scripts/release.sh <version>`——检查干净树/main/已推送 → 跑 `Scripts/test.sh` → 打 `v<version>` tag → push main+tag；`--local` 选项在本机构建并直接创建 Release。
+- CI：`.github/workflows/ci.yml`（push/PR → swift build + 测试）与 `.github/workflows/release.yml`（push `v*` tag → 测试 → 构建 → 打包 zip → 创建 Release 并附产物）。CI 只依赖公开 runner 与 checkout，不使用任何个人路径、账号或令牌。
+- Release notes：`--generate-notes` 自动生成变更 + 固定安装说明（xattr 解除隔离）与已知问题（未公证）。
+- Agent 发版 Runbook：确认干净树与 main 已推送 → `bash Scripts/release.sh <version>` → `gh run watch` 等 release.yml 绿 → `gh release view v<version>` 校验产物与版本号。失败时修复后删除本地与远程 tag 重跑（尚未有下载者时可安全重跑）。
 
 ## 9. 从现有手搓项目初始化 GitHub 管理
 
