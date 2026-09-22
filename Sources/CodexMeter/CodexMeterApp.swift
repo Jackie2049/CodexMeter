@@ -1,3 +1,4 @@
+import CodexMeterCore
 import SwiftUI
 
 @main
@@ -16,6 +17,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        L10n.language = AppSettings.language
+        // Language picker default before the user picks one.
+        UserDefaults.standard.register(defaults: ["appLanguage": AppSettings.language.rawValue])
         let monitor = UsageMonitor()
         self.monitor = monitor
         statusItemController = StatusItemController(monitor: monitor)

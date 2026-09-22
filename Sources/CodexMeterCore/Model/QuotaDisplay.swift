@@ -25,8 +25,8 @@ public enum QuotaThresholds {
 /// primary/secondary field positions — OpenAI reshuffled the fields when the
 /// account moved to Pro (primary became the weekly window, secondary null).
 public enum QuotaDisplay {
-    static let fiveHoursSeconds = 18000
-    static let weekSeconds = 604800
+    public static let fiveHoursSeconds = 18000
+    public static let weekSeconds = 604800
     /// Windows this short show a clock time instead of a countdown.
     static let statusClockWindowSeconds = 6 * 3600
 
@@ -37,14 +37,9 @@ public enum QuotaDisplay {
         return formatter
     }()
 
-    /// Canonical window names, used everywhere (status bar, panel, alerts):
-    /// 18000 → "5小时", 604800 → "周度".
+    /// Canonical window names, used everywhere (status bar, panel, alerts).
     public static func shortLabel(seconds: Int) -> String {
-        switch seconds {
-        case fiveHoursSeconds: "5小时"
-        case weekSeconds: "周度"
-        default: "窗口"
-        }
+        L10n.Window.short(seconds: seconds)
     }
 
     public static func longLabel(seconds: Int) -> String {
@@ -145,7 +140,7 @@ public enum QuotaDisplay {
             let remaining = window.resetAt.timeIntervalSince(now)
             let reset: String
             if remaining <= 0 {
-                reset = "等待更新"
+                reset = L10n.Reset.waiting
             } else if window.windowSeconds <= statusClockWindowSeconds {
                 reset = clockFormatter.string(from: window.resetAt)
             } else {
@@ -179,20 +174,13 @@ public enum QuotaDisplay {
     /// "2 小时 48 分后" / "6 天 13 小时后" / "等待更新"; no seconds.
     public static func resetLeadText(resetAt: Date, now: Date) -> String {
         let remaining = resetAt.timeIntervalSince(now)
-        if remaining <= 0 { return "等待更新" }
+        if remaining <= 0 { return L10n.Reset.waiting }
 
         let total = Int(remaining.rounded(.up))
         let days = total / 86400
         let hours = (total % 86400) / 3600
         let minutes = (total % 3600) / 60
-
-        if days >= 1 {
-            return hours > 0 ? "\(days) 天 \(hours) 小时后" : "\(days) 天后"
-        }
-        if hours >= 1 {
-            return minutes > 0 ? "\(hours) 小时 \(minutes) 分后" : "\(hours) 小时后"
-        }
-        return "\(max(1, minutes)) 分后"
+        return L10n.Reset.unit(days: days, hours: hours, minutes: minutes)
     }
 
     /// Natural-Chinese reset countdown: "6 天 13 小时后重置", "3 小时后重置",
@@ -201,6 +189,6 @@ public enum QuotaDisplay {
     /// only a fresh snapshot can confirm that.
     public static func resetText(resetAt: Date, now: Date) -> String {
         let lead = resetLeadText(resetAt: resetAt, now: now)
-        return lead == "等待更新" ? lead : lead + "重置"
+        return lead == L10n.Reset.waiting ? lead : lead + L10n.Reset.suffix
     }
 }

@@ -188,12 +188,12 @@ final class UsageMonitor: ObservableObject {
 
     static func describe(_ error: Error) -> String {
         switch error {
-        case let UsageClientError.http(status): "服务返回错误 (HTTP \(status))"
-        case let url as URLError where url.code == .timedOut: "请求超时"
-        case let url as URLError where url.code == .notConnectedToInternet: "无网络连接"
-        case let url as URLError where url.code == .cannotFindHost: "无法解析 chatgpt.com"
-        case is DecodingError: "响应解析失败"
-        default: "网络错误: \(error.localizedDescription)"
+        case let UsageClientError.http(status): L10n.Errors.http(status)
+        case let url as URLError where url.code == .timedOut: L10n.Errors.timeout
+        case let url as URLError where url.code == .notConnectedToInternet: L10n.Errors.noNetwork
+        case let url as URLError where url.code == .cannotFindHost: L10n.Errors.cannotResolveHost
+        case is DecodingError: L10n.Errors.parseFailed
+        default: L10n.Errors.network(error.localizedDescription)
         }
     }
 }

@@ -53,7 +53,7 @@ public final class NotificationGate {
         let label = QuotaDisplay.longLabel(seconds: window.windowSeconds)
         let resetText = Self.resetText(resetAt: window.resetAt, windowSeconds: window.windowSeconds)
         return UsageAlert(
-            message: "Codex \(label) 额度剩余 \(window.remainingPercent)%，\(resetText)重置",
+            message: L10n.Notif.quotaAlert(window: label, percent: window.remainingPercent, resetTime: resetText),
             dedupKey: key)
     }
 
@@ -63,7 +63,7 @@ public final class NotificationGate {
         let key = "\(keyPrefix).limit.\(Int(anchor.timeIntervalSince1970))"
         guard !defaults.bool(forKey: key) else { return nil }
         defaults.set(true, forKey: key)
-        return UsageAlert(message: "Codex 用量已触顶，等待窗口重置", dedupKey: key)
+        return UsageAlert(message: L10n.Notif.limitReached, dedupKey: key)
     }
 
     static func resetText(resetAt: Date, windowSeconds: Int) -> String {

@@ -1,4 +1,5 @@
 import Foundation
+import CodexMeterCore
 import SwiftUI
 
 /// UserDefaults-backed settings. The monitor reads values at poll
@@ -7,11 +8,22 @@ enum AppSettings {
     static let pollIntervalOptions: [Int] = [30, 60, 300]
 
     static func label(forInterval seconds: Int) -> String {
-        switch seconds {
-        case 30: "30 秒"
-        case 60: "1 分钟"
-        case 300: "5 分钟"
-        default: "\(seconds) 秒"
+        L10n.Menu.interval(seconds)
+    }
+
+    // MARK: - Interface language
+
+    /// Persisted interface language; defaults to the system language on
+    /// first launch. Setting this also syncs L10n and posts a change note.
+    static var language: AppLanguage {
+        get {
+            UserDefaults.standard.string(forKey: "appLanguage")
+                .flatMap(AppLanguage.init(rawValue:)) ?? L10n.systemDefault
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: "appLanguage")
+            L10n.language = newValue
+            NotificationCenter.default.post(name: .codexMeterLanguageChanged, object: nil)
         }
     }
 

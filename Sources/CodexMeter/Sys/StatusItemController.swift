@@ -85,7 +85,7 @@ final class StatusItemContentView: NSView {
         let refresh = NSImageView()
         refresh.contentTintColor = .labelColor
         refresh.image = NSImage(systemSymbolName: "arrow.counterclockwise",
-                                accessibilityDescription: "重置")?
+                                accessibilityDescription: L10n.Status.resetMarkAccessibility)?
             .withSymbolConfiguration(.init(pointSize: 7.5, weight: .medium))
 
         let reset = NSTextField(labelWithString: "")
@@ -228,6 +228,13 @@ final class StatusItemController: NSObject {
             object: popover,
             queue: .main) { [weak self] _ in
             Task { @MainActor in self?.presentationDidClose() }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: .codexMeterLanguageChanged,
+            object: nil,
+            queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.render() }
         }
 
         // objectWillChange fires before values change; hopping to the next

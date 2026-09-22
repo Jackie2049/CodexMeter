@@ -9,6 +9,7 @@ struct MenuPanelView: View {
     @AppStorage("pollIntervalSeconds") private var pollInterval = 60
     @AppStorage("notificationsEnabled") private var notificationsEnabled = true
     @AppStorage("resetReminderEnabled") private var resetReminderEnabled = true
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.zhHans.rawValue
     @State private var now = Date()
 
     var body: some View {
@@ -62,7 +63,7 @@ struct MenuPanelView: View {
                         Text(Self.planDisplay(plan))
                     }
                     if snapshot.resetCreditsAvailable > 0 {
-                        Text("· \(snapshot.resetCreditsAvailable) 次可用重置")
+                        Text("· \(L10n.Panel.resetCredits(snapshot.resetCreditsAvailable))")
                     }
                 }
                 .font(.system(size: 12))
@@ -80,21 +81,27 @@ struct MenuPanelView: View {
 
     private var settingsMenu: some View {
         Menu {
-            Picker("轮询间隔", selection: $pollInterval) {
+            Picker(L10n.Menu.pollInterval, selection: $pollInterval) {
                 ForEach(AppSettings.pollIntervalOptions, id: \.self) { option in
                     Text(AppSettings.label(forInterval: option)).tag(option)
                 }
             }
             .pickerStyle(.inline)
-            Toggle("用量阈值通知", isOn: $notificationsEnabled)
-            Toggle("重置提醒", isOn: $resetReminderEnabled)
+            Toggle(L10n.Menu.thresholdAlerts, isOn: $notificationsEnabled)
+            Toggle(L10n.Menu.resetReminder, isOn: $resetReminderEnabled)
+            Picker(L10n.Menu.language, selection: $appLanguage) {
+                ForEach(AppLanguage.allCases, id: \.self) { lang in
+                    Text(lang.displayName).tag(lang.rawValue)
+                }
+            }
+            .pickerStyle(.inline)
             if LoginItem.isSupported {
-                Toggle("开机自启", isOn: Binding(
+                Toggle(L10n.Menu.launchAtLogin, isOn: Binding(
                     get: { LoginItem.isEnabled },
                     set: { _ = LoginItem.setEnabled($0) }))
             }
             Divider()
-            Button("退出 CodexMeter") { NSApp.terminate(nil) }
+            Button(L10n.Menu.quit) { NSApp.terminate(nil) }
         } label: {
             Image(systemName: "gearshape")
                 .font(.system(size: 12))
@@ -105,8 +112,8 @@ struct MenuPanelView: View {
         .fixedSize()
         .frame(width: 24, height: 24)
         .contentShape(Rectangle())
-        .help("设置")
-        .accessibilityLabel("设置")
+        .help(L10n.Panel.settings)
+        .accessibilityLabel(L10n.Panel.settings)
     }
 
     // MARK: - Compact status line (errors only; low quota speaks via color)
@@ -120,18 +127,18 @@ struct MenuPanelView: View {
     private var statusItem: StatusItem? {
         switch monitor.authState {
         case .noAuth:
-            return StatusItem(text: "未登录 · 请在终端运行 codex login", color: .red, showsRetry: false)
+            return StatusItem(text: L10n.Panel.notLoggedIn, color: .red, showsRetry: false)
         case .loginExpired:
-            return StatusItem(text: "登录已过期 · 请重新运行 codex login", color: .red, showsRetry: false)
+            return StatusItem(text: L10n.Panel.loginExpired, color: .red, showsRetry: false)
         case .ok, .unknown:
             if monitor.snapshot?.limitReached == true {
-                return StatusItem(text: "额度已触顶，等待窗口重置", color: .red, showsRetry: false)
+                return StatusItem(text: L10n.Panel.limitReached, color: .red, showsRetry: false)
             }
             if monitor.lastError != nil, monitor.snapshot != nil {
-                return StatusItem(text: "更新失败 · 数据来自 \(relativeUpdateText)", color: .orange, showsRetry: true)
+                return StatusItem(text: L10n.Panel.updateFailed(dataAge: relativeUpdateText), color: .orange, showsRetry: true)
             }
             if monitor.isStale, monitor.snapshot != nil {
-                return StatusItem(text: "数据待更新", color: .orange, showsRetry: false)
+                return StatusItem(text: L10n.Panel.stale, color: .orange, showsRetry: false)
             }
             return nil
         }
@@ -147,7 +154,7 @@ struct MenuPanelView: View {
                 .foregroundStyle(status.color)
             Spacer(minLength: 8)
             if status.showsRetry {
-                Button("重试") {
+                Button(L10n.Panel.retry) {
                     Task { await monitor.refreshNow() }
                 }
                 .buttonStyle(.link)
@@ -172,7 +179,7 @@ struct MenuPanelView: View {
             if monitor.isRefreshing {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.mini)
-                    Text("获取用量中…")
+                    Text(L10n.Panel.fetching)
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
@@ -195,7 +202,7 @@ struct MenuPanelView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(QuotaDisplay.longLabel(seconds: window.windowSeconds))
                         .font(.system(size: 13, weight: .medium))
-                    Text("剩余")
+                    Text(L10n.Panel.remainingCaption)
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
@@ -241,32 +248,6 @@ struct MenuPanelView: View {
         }
     }
 
-    // MARK: - Settings (exposed inline)
-
-    private var settings: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Picker("轮询间隔", selection: $pollInterval) {
-                ForEach(AppSettings.pollIntervalOptions, id: \.self) { option in
-                    Text(AppSettings.label(forInterval: option)).tag(option)
-                }
-            }
-            .pickerStyle(.segmented)
-            .controlSize(.small)
-
-            Toggle("用量阈值通知", isOn: $notificationsEnabled)
-
-            if LoginItem.isSupported {
-                Toggle("开机自启", isOn: Binding(
-                    get: { LoginItem.isEnabled },
-                    set: { _ = LoginItem.setEnabled($0) }))
-            }
-        }
-        .font(.system(size: 12))
-        .toggleStyle(.switch)
-        .controlSize(.small)
-        .padding(.top, 12)
-    }
-
     // MARK: - Bottom bar
 
     private var bottomBar: some View {
@@ -293,8 +274,8 @@ struct MenuPanelView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .disabled(monitor.isRefreshing)
-            .help("立即刷新")
-            .accessibilityLabel("立即刷新")
+            .help(L10n.Panel.refreshNow)
+            .accessibilityLabel(L10n.Panel.refreshNow)
 
             Spacer()
 
@@ -302,7 +283,7 @@ struct MenuPanelView: View {
                 Self.openCodexApp()
             } label: {
                 HStack(spacing: 3) {
-                    Text("打开 Codex")
+                    Text(L10n.Panel.openCodex)
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 10))
                 }
@@ -315,25 +296,27 @@ struct MenuPanelView: View {
     // MARK: - Text helpers
 
     private var updateText: String {
-        guard monitor.lastRefresh != nil else { return "尚未更新" }
+        guard monitor.lastRefresh != nil else { return L10n.Panel.notUpdatedYet }
         if monitor.lastError != nil || monitor.isStale {
-            return "上次成功更新 \(relativeUpdateText)"
+            return L10n.Panel.lastSuccessfulUpdate(relativeUpdateText)
         }
-        return relativeUpdateText == "刚刚" ? "刚刚更新" : "\(relativeUpdateText)更新"
+        return relativeUpdateText == L10n.Age.justNow
+            ? L10n.Panel.justUpdated
+            : L10n.Panel.updatedAgo(relativeUpdateText)
     }
 
     /// "刚刚" / "42 秒前" / "3 分钟前" / "1 天 2 小时前" — success-time age.
     private var relativeUpdateText: String {
         guard let lastRefresh = monitor.lastRefresh else { return "—" }
         let age = now.timeIntervalSince(lastRefresh)
-        if age < 5 { return "刚刚" }
+        if age < 5 { return L10n.Age.justNow }
         let total = Int(age.rounded())
-        if total < 60 { return "\(total) 秒前" }
+        if total < 60 { return L10n.Age.seconds(total) }
         let minutes = total / 60
-        if minutes < 60 { return "\(minutes) 分钟前" }
+        if minutes < 60 { return L10n.Age.minutes(minutes) }
         let hours = minutes / 60
-        if hours < 24 { return "\(hours) 小时 \(minutes % 60) 分前" }
-        return "\(hours / 24) 天 \(hours % 24) 小时前"
+        if hours < 24 { return L10n.Age.hoursMinutes(hours, minutes % 60) }
+        return L10n.Age.daysHours(hours / 24, hours % 24)
     }
 
     static func color(for tier: QuotaTier) -> Color {
