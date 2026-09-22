@@ -284,6 +284,15 @@ final class StatusItemController: NSObject {
         monitor.refreshIfStale(maxAge: 20)
         guard let button = statusItem.button else { return }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+
+        // NSPopover's built-in animation duration is fixed (~0.25s, too
+        // slow); show instantly and fade the content in quickly instead.
+        hosting.view.alphaValue = 0
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.1
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            hosting.view.animator().alphaValue = 1
+        }
         if !pinned {
             startMouseMoveTracking()
         }
