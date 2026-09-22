@@ -15,17 +15,23 @@ final class StatusItemContentView: NSView {
         view.contentTintColor = .labelColor
         return view
     }()
-    private let quotaLabel = NSTextField(labelWithString: "")
-    private let symbolImageView = NSImageView()
-    private let resetLabel = NSTextField(labelWithString: "")
+
+    /// One row per window: [bolt] [label] [quota] · [↻] [reset]
+    private struct WindowRow {
+        let stack: NSStackView
+        let bolt: NSImageView
+        let label: NSTextField
+        let quota: NSTextField
+        let dot: NSTextField
+        let refresh: NSImageView
+        let reset: NSTextField
+    }
+
+    private var windowRows: [WindowRow] = []
     private var verticalOffset: NSLayoutConstraint!
 
-    /// true = pointer entered the item, false = left. Region-based tracking
-    /// works regardless of hitTest transparency.
     var onHover: ((Bool) -> Void)?
 
-    /// This view is transparent to clicks (hitTest nil) so the underlying
-    /// NSStatusBarButton receives them and its toggle action keeps working.
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override init(frame frameRect: NSRect) {
@@ -36,43 +42,68 @@ final class StatusItemContentView: NSView {
             owner: self,
             userInfo: nil))
 
-        quotaLabel.font = .systemFont(ofSize: 9.5)
-        quotaLabel.textColor = .labelColor
-        symbolImageView.contentTintColor = .labelColor
-        resetLabel.font = .systemFont(ofSize: 9.5)
-        resetLabel.textColor = .labelColor
+        let row0 = makeWindowRow()
+        let row1 = makeWindowRow()
+        windowRows = [row0, row1]
 
-        // Quota row: leading meter symbol (bolt / warning triangle) + text.
-        let quotaRow = NSStackView(views: [symbolImageView, quotaLabel])
-        quotaRow.orientation = .horizontal
-        quotaRow.alignment = .centerY
-        quotaRow.spacing = 3
+        let rows = NSStackView(views: [row0.stack, row1.stack])
+        rows.orientation = .vertical
+        rows.alignment = .leading
+        rows.spacing = 2
 
-        let lines = NSStackView(views: [quotaRow, resetLabel])
-        lines.orientation = .vertical
-        lines.alignment = .leading
-        lines.spacing = 2
+        let content = NSStackView(views: [logoView, rows])
+        content.orientation = .horizontal
+        content.alignment = .centerY
+        content.spacing = 5
+        content.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(content)
 
-        let row = NSStackView(views: [logoView, lines])
-        row.orientation = .horizontal
-        row.alignment = .centerY
-        row.spacing = 5
-        row.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(row)
-
-        verticalOffset = row.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 0)
+        verticalOffset = content.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 0)
         NSLayoutConstraint.activate([
-            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
-            trailingAnchor.constraint(greaterThanOrEqualTo: row.trailingAnchor, constant: 5),
+            content.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
+            trailingAnchor.constraint(greaterThanOrEqualTo: content.trailingAnchor, constant: 5),
             verticalOffset,
             logoView.widthAnchor.constraint(equalToConstant: 23.4),
             logoView.heightAnchor.constraint(equalToConstant: 23.4),
-            symbolImageView.widthAnchor.constraint(equalToConstant: 10),
-            symbolImageView.heightAnchor.constraint(equalToConstant: 10),
         ])
+        row1.stack.isHidden = true // single-window plans show one row
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
+
+    private func makeWindowRow() -> WindowRow {
+        let bolt = NSImageView()
+        bolt.contentTintColor = .labelColor
+
+        let label = NSTextField(labelWithString: "")
+        label.font = .systemFont(ofSize: 9.5)
+        label.textColor = .labelColor
+
+        let quota = NSTextField(labelWithString: "")
+        quota.font = .systemFont(ofSize: 9.5)
+        quota.textColor = .labelColor
+
+        let dot = NSTextField(labelWithString: "·")
+        dot.font = .systemFont(ofSize: 9.5)
+        dot.textColor = .labelColor
+
+        let refresh = NSImageView()
+        refresh.contentTintColor = .labelColor
+        refresh.image = NSImage(systemSymbolName: "arrow.counterclockwise",
+                                accessibilityDescription: "重置")?
+            .withSymbolConfiguration(.init(pointSize: 7.5, weight: .medium))
+
+        let reset = NSTextField(labelWithString: "")
+        reset.font = .systemFont(ofSize: 9.5)
+        reset.textColor = .labelColor
+
+        let stack = NSStackView(views: [bolt, label, quota, dot, refresh, reset])
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.spacing = 3
+        return WindowRow(stack: stack, bolt: bolt, label: label,
+                         quota: quota, dot: dot, refresh: refresh, reset: reset)
+    }
 
     override func mouseEntered(with event: NSEvent) {
         onHover?(true)
@@ -82,31 +113,54 @@ final class StatusItemContentView: NSView {
         onHover?(false)
     }
 
-    func update(quota: String, resets: String?, symbolName: String?, offset: Double) {
-        quotaLabel.stringValue = quota
-        if let symbolName {
-            symbolImageView.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
+    /// rows: per-window (label, quota, reset). When empty, `fallback` renders
+    /// as a single plain line (未登录 / –).
+    func update(rows: [(label: String, quota: String, reset: String)],
+                fallback: String?, symbolName: String?, offset: Double) {
+        let symbolImage = symbolName.flatMap {
+            NSImage(systemSymbolName: $0, accessibilityDescription: nil)?
                 .withSymbolConfiguration(.init(pointSize: 8, weight: .medium))
-            symbolImageView.isHidden = false
-        } else {
-            symbolImageView.isHidden = true
         }
-        if let resets {
-            resetLabel.stringValue = resets
-            resetLabel.isHidden = false
-        } else {
-            resetLabel.stringValue = ""
-            resetLabel.isHidden = true
+
+        for (index, row) in windowRows.enumerated() {
+            if index < rows.count {
+                let line = rows[index]
+                row.bolt.image = symbolImage
+                row.bolt.isHidden = symbolImage == nil
+                row.label.stringValue = line.label
+                row.label.isHidden = false
+                row.quota.stringValue = line.quota
+                row.quota.isHidden = false
+                row.dot.isHidden = false
+                row.refresh.isHidden = false
+                row.reset.stringValue = line.reset
+                row.reset.isHidden = false
+            } else {
+                row.bolt.isHidden = true
+                row.label.isHidden = true
+                row.quota.isHidden = true
+                row.dot.isHidden = true
+                row.refresh.isHidden = true
+                row.reset.isHidden = true
+            }
         }
+
+        if rows.isEmpty, let fallback {
+            let row = windowRows[0]
+            row.quota.stringValue = fallback
+            row.quota.isHidden = false
+        }
+
         verticalOffset.constant = offset
     }
 
     /// Width the status item should reserve for the content plus padding.
     var preferredWidth: CGFloat {
-        let quotaRow = quotaLabel.intrinsicContentSize.width
-            + (symbolImageView.isHidden ? 0 : 3 + 10)
-        let resetRow = resetLabel.isHidden ? 0 : resetLabel.intrinsicContentSize.width
-        return 23.4 + 5 + max(quotaRow, resetRow) + 10
+        var rowsWidth: CGFloat = 0
+        for row in windowRows where !row.stack.isHidden {
+            rowsWidth = max(rowsWidth, row.stack.fittingSize.width)
+        }
+        return 23.4 + 5 + rowsWidth + 10
     }
 }
 
@@ -342,8 +396,8 @@ final class StatusItemController: NSObject {
             now: Date())
 
         contentView.update(
-            quota: components.quota,
-            resets: components.resets,
+            rows: components.lines.map { ($0.label, $0.quota, $0.reset) },
+            fallback: components.lines.isEmpty ? components.quota : nil,
             symbolName: components.symbolName,
             offset: AppSettings.menuBarBaselineOffset)
         statusItem.length = contentView.preferredWidth

@@ -168,12 +168,25 @@ private func testMenuBarTitleComponentsTwoLines() throws {
     let components = QuotaDisplay.menuBarTitleComponents(
         snapshot: healthy, notLoggedIn: false, loginExpired: false, dataWarning: false, now: now)
     try expectEqual(components.brand, "Codex ⚡", "brand sits leftmost")
-    try expectEqual(components.quota, "5小时 97% · 周度 83%", "top line: remaining quota")
-    try expectEqual(components.symbolName, "bolt.fill", "bolt trails the quota line")
+    try expectEqual(components.symbolName, "bolt.fill", "bolt leads each quota")
+
+    // One row per window: 5小时 on top, 周度 below; quota then reset.
+    try expectEqual(components.lines.count, 2, "two windows, two rows")
+    let first = try expectNotNil(components.lines.first, "first row")
+    try expectEqual(first.label, "5小时", "row 1 label")
+    try expectEqual(first.quota, "97%", "row 1 quota")
+    try expectEqual(first.reset, "2 小时 48 分后", "row 1 reset")
+    let second = try expectNotNil(components.lines.dropFirst().first, "second row")
+    try expectEqual(second.label, "周度", "row 2 label")
+    try expectEqual(second.quota, "83%", "row 2 quota")
+    try expectEqual(second.reset, "6 天 13 小时后", "row 2 reset")
+
+    // Legacy combined strings still serve the single-line menuBarTitle.
+    try expectEqual(components.quota, "5小时 97% · 周度 83%", "legacy combined quota")
     try expectEqual(
         components.resets,
         "↻ 2 小时 48 分后 · 6 天 13 小时后",
-        "bottom line: reset times, dot-separated, reset symbol prefix")
+        "legacy combined resets")
 
     // Limit reached → warning symbol replaces the bolt.
     let limited = snapshot(
@@ -193,6 +206,7 @@ private func testMenuBarTitleComponentsTwoLines() throws {
         snapshot: healthy, notLoggedIn: true, loginExpired: false, dataWarning: false, now: now)
     try expectEqual(loggedOut.brand, "Codex ⚠️", "auth problem brand")
     try expectEqual(loggedOut.quota, "未登录", "auth problem quota text")
+    try expectEqual(loggedOut.lines.count, 0, "no rows without data")
     try expectNil(loggedOut.symbolName, "no meter symbol without data")
     try expectNil(loggedOut.resets, "no reset row when logged out")
 
@@ -201,13 +215,15 @@ private func testMenuBarTitleComponentsTwoLines() throws {
         snapshot: nil, notLoggedIn: false, loginExpired: false, dataWarning: false, now: now)
     try expectEqual(noData.brand, "Codex ⚡", "no data brand")
     try expectEqual(noData.quota, "–", "no data quota text")
+    try expectEqual(noData.lines.count, 0, "no rows without data")
     try expectNil(noData.symbolName, "no meter symbol without data")
     try expectNil(noData.resets, "no reset row without windows")
 
-    // Stale data keeps both rows (numbers + warning marker stay).
+    // Stale data marks every quota line.
     let stale = QuotaDisplay.menuBarTitleComponents(
         snapshot: healthy, notLoggedIn: false, loginExpired: false, dataWarning: true, now: now)
-    try expectEqual(stale.quota, "5小时 97% · 周度 83% ⚠️", "warning marker on quota line")
+    try expectEqual(stale.lines.first?.quota, "97% ⚠️", "row 1 quota carries warning")
+    try expectEqual(stale.lines.dropFirst().first?.quota, "83% ⚠️", "row 2 quota carries warning")
     try expectEqual(stale.symbolName, "bolt.fill", "bolt stays on stale data")
     try expectNotNil(stale.resets, "reset row survives data warning")
 }

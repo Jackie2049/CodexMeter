@@ -83,36 +83,58 @@ public enum QuotaDisplay {
         return "\(components.brand) \(components.quota)"
     }
 
+    public struct MenuBarWindowLine: Equatable, Sendable {
+        /// Window name: "5小时" / "周度".
+        public let label: String
+        /// Remaining quota text: "84%" (+" ⚠️" on stale data).
+        public let quota: String
+        /// Reset countdown: "3 小时 12 分后" / "等待更新".
+        public let reset: String
+    }
+
     public struct MenuBarTitleComponents: Equatable, Sendable {
         /// Leftmost element: "Codex ⚡" (or "Codex ⚠️" on auth problems).
         public let brand: String
-        /// Quota text: "5小时 97% · 周度 83%" / "未登录" / "–".
+        /// Legacy combined quota text: "5小时 97% · 周度 83%" (menuBarTitle).
         public let quota: String
-        /// SF Symbol trailing the quota row: bolt normally, warning triangle
+        /// One row per present window, shortest window first.
+        public let lines: [MenuBarWindowLine]
+        /// SF Symbol leading each quota row: bolt normally, warning triangle
         /// when the limit is reached; nil without live data.
         public let symbolName: String?
-        /// Bottom line (nil when nothing to show): "↻ 2 小时 48 分后 · 6 天 13 小时后".
+        /// Legacy combined reset text (menuBarTitle).
         public let resets: String?
     }
 
-    /// Status item content: logo leftmost, quota + reset rows stacked to
-    /// its right. Auth problems collapse to a single quota line — there are
-    /// no windows to count down.
+    /// Status item content: logo leftmost, one row per window (quota + its
+    /// own reset). Auth problems collapse to a single quota line — there
+    /// are no windows to count down.
     public static func menuBarTitleComponents(snapshot: UsageSnapshot?,
                                               notLoggedIn: Bool,
                                               loginExpired: Bool,
                                               dataWarning: Bool,
                                               now: Date = Date()) -> MenuBarTitleComponents {
         if notLoggedIn {
-            return MenuBarTitleComponents(brand: "Codex ⚠️", quota: "未登录", symbolName: nil, resets: nil)
+            return MenuBarTitleComponents(brand: "Codex ⚠️", quota: "未登录",
+                                          lines: [], symbolName: nil, resets: nil)
         }
         if loginExpired {
-            return MenuBarTitleComponents(brand: "Codex ⚠️", quota: "过期", symbolName: nil, resets: nil)
+            return MenuBarTitleComponents(brand: "Codex ⚠️", quota: "过期",
+                                          lines: [], symbolName: nil, resets: nil)
         }
 
         let windows = [snapshot?.primary, snapshot?.secondary].compactMap { $0 }
         var quota = statusSlots(windows: windows) ?? "–"
         if dataWarning && snapshot != nil { quota += " ⚠️" }
+
+        let lines = windows.map { window -> MenuBarWindowLine in
+            var lineQuota = "\(window.remainingPercent)%"
+            if dataWarning { lineQuota += " ⚠️" }
+            return MenuBarWindowLine(
+                label: longLabel(seconds: window.windowSeconds),
+                quota: lineQuota,
+                reset: resetLeadText(resetAt: window.resetAt, now: now))
+        }
 
         let symbolName: String?
         if snapshot == nil {
@@ -127,7 +149,8 @@ public enum QuotaDisplay {
             ? nil
             : "↻ " + windows.map { resetLeadText(resetAt: $0.resetAt, now: now) }
                 .joined(separator: " · ")
-        return MenuBarTitleComponents(brand: "Codex ⚡", quota: quota, symbolName: symbolName, resets: resets)
+        return MenuBarTitleComponents(brand: "Codex ⚡", quota: quota,
+                                      lines: lines, symbolName: symbolName, resets: resets)
     }
 
     /// Natural-Chinese reset countdown WITHOUT the "重置" suffix — used in
