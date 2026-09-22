@@ -15,7 +15,7 @@ enum CodexMark {
     static var templateImage: NSImage? {
         guard let image = NSImage(data: Data(svgSource.utf8)) else { return nil }
         image.isTemplate = true
-        image.size = NSSize(width: 13, height: 13)
+        image.size = NSSize(width: 19.5, height: 19.5)
         return image
     }
 }

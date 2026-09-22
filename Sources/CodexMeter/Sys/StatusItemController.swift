@@ -56,8 +56,8 @@ final class StatusItemContentView: NSView {
             row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 5),
             trailingAnchor.constraint(greaterThanOrEqualTo: row.trailingAnchor, constant: 5),
             verticalOffset,
-            logoView.widthAnchor.constraint(equalToConstant: 13),
-            logoView.heightAnchor.constraint(equalToConstant: 13),
+            logoView.widthAnchor.constraint(equalToConstant: 19.5),
+            logoView.heightAnchor.constraint(equalToConstant: 19.5),
             symbolImageView.widthAnchor.constraint(equalToConstant: 10),
             symbolImageView.heightAnchor.constraint(equalToConstant: 10),
         ])
@@ -89,7 +89,7 @@ final class StatusItemContentView: NSView {
         let quotaRow = quotaLabel.intrinsicContentSize.width
             + (symbolImageView.isHidden ? 0 : 3 + 10)
         let resetRow = resetLabel.isHidden ? 0 : resetLabel.intrinsicContentSize.width
-        return 13 + 5 + max(quotaRow, resetRow) + 10
+        return 19.5 + 5 + max(quotaRow, resetRow) + 10
     }
 }
 
@@ -126,6 +126,11 @@ final class StatusItemController: NSObject {
             button.title = "" // content drawn by StatusItemContentView
             button.target = self
             button.action = #selector(togglePopover(_:))
+            // An empty-title status button collapses to zero height — the
+            // content then draws as overflow and real mouse clicks fall
+            // through the hit test (AXPress bypasses it, which is why the
+            // simulated clicks "worked"). Pin the bar thickness explicitly.
+            button.heightAnchor.constraint(equalToConstant: NSStatusBar.system.thickness).isActive = true
 
             let view = StatusItemContentView()
             contentView = view
