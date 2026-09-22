@@ -27,8 +27,8 @@ final class StatusItemContentView: NSView {
         resetLabel.font = .systemFont(ofSize: 8)
         resetLabel.textColor = .labelColor
 
-        // Quota row: text + trailing meter symbol (bolt / warning triangle).
-        let quotaRow = NSStackView(views: [quotaLabel, symbolImageView])
+        // Quota row: leading meter symbol (bolt / warning triangle) + text.
+        let quotaRow = NSStackView(views: [symbolImageView, quotaLabel])
         quotaRow.orientation = .horizontal
         quotaRow.alignment = .centerY
         quotaRow.spacing = 3
