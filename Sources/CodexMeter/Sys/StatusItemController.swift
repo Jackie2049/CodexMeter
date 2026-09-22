@@ -241,7 +241,7 @@ final class StatusItemController: NSObject {
             hoverHideTimer?.invalidate()
             hoverHideTimer = nil
         } else if hoverHideTimer == nil {
-            hoverHideTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) { [weak self] _ in
+            hoverHideTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: false) { [weak self] _ in
                 Task { @MainActor in self?.closePopover() }
             }
         }
